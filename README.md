@@ -34,7 +34,7 @@ To access Perfana you need a key and for Perfana Cloud you need mTLS certificate
 
     perfana init
 
-If no `~/.perfana` directory exists, it will be created with `perfana.conf` file that contains
+If no `~/.perfana-cli` directory exists, it will be created with `perfana.yaml` file that contains
 placeholders for key and mTLS certificates. Also, defaults for `systemUnderTest`, `environment` and `workload`.
 These will be used in the commands with no explicit overrides on the command line.
 
@@ -42,7 +42,7 @@ For Perfana Cloud, fill the `clientIdentifier` that is used in the `<clientIdent
 
 To start a run of 30 minutes use:
 
-    perfana run start --run-duration=PT30m
+    perfana run start --rampupTime=PT10m --constantLoadTime=PT20m --tags="k6,jfr" --annotation="Running custom test" --version="2.0.1" --buildResultsUrl="http://example.com/results"
 
 This will start a test run and send keep-alives for 30 minutes. It will keep running until the 
 run duration has passed or when you kill the command (e.g. using `ctrl-C`).
@@ -56,7 +56,7 @@ To stop an existing run use:
 
 This command is needed only to reset a current run that does not stop automatically.
    
-In the `~/.perfana` directory the current run information is stored in `perfana-run.state`.
+In the `~/.perfana-cli` directory the current run information is stored in `perfana-run.state`.
 
 ## What it is not
 
