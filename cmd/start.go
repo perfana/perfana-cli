@@ -130,7 +130,7 @@ var startCmd = &cobra.Command{
 			for {
 				select {
 				case <-keepAliveTicker.C:
-					err := client.TestEvent(testRunID, additionalData, completed)
+					err := client.TestEvent(testRunID, additionalData, false)
 					if err != nil {
 						fmt.Printf("Error sending abort event: %v\n", err)
 					} else {
