@@ -31,12 +31,16 @@ import (
 )
 
 // Define command-line flags with default values
-var rampupTime string
-var constantLoadTime string
-var tags string
-var annotation string
-var version string
-var buildResultsUrl string
+var (
+	rampupTime       string
+	constantLoadTime string
+	tags             string
+	annotation       string
+	version          string
+	buildResultsUrl  string
+	variablesFlag    []string
+	deepLinksFlag    []string
+)
 
 // startCmd represents the start command
 var startCmd = &cobra.Command{
@@ -66,6 +70,35 @@ var startCmd = &cobra.Command{
 		if err != nil {
 			fmt.Printf("Error parsing configuration file: %v\n", err)
 			return
+		}
+
+		// Parse Variables (into []Variable)
+		var variables []perfana_client.Variable
+		for _, v := range variablesFlag {
+			parts := strings.SplitN(v, "=", 2) // Split key=value
+			if len(parts) != 2 {
+				fmt.Printf("Invalid variable format: '%s'\n", v)
+				continue
+			}
+			variables = append(variables, perfana_client.Variable{
+				Placeholder: strings.TrimSpace(parts[0]),
+				Value:       strings.TrimSpace(parts[1]),
+			})
+		}
+
+		// Parse DeepLinks (into []DeepLink)
+		var deepLinks []perfana_client.DeepLink
+		for _, link := range deepLinksFlag {
+			parts := strings.SplitN(link, "|", 2) // Split title|url
+			if len(parts) != 2 {
+				fmt.Printf("Invalid deeplink format: '%s'\n", link)
+				continue
+			}
+			deepLinks = append(deepLinks, perfana_client.DeepLink{
+				Name: strings.TrimSpace(parts[0]),
+				URL:  strings.TrimSpace(parts[1]),
+				Type: "link", // TODO also add type to input as (optional) part 3?
+			})
 		}
 
 		rampupTimeMinutes, err := util.ParseISODuration(rampupTime)
@@ -106,6 +139,8 @@ var startCmd = &cobra.Command{
 			"duration":          fmt.Sprintf("%d", constantLoadTimeMinutes*60),
 			"annotations":       annotation,
 			"tags":              strings.Split(tags, ","),
+			"variables":         variables,
+			"deepLinks":         deepLinks,
 		}
 
 		// Start a Perfana session
@@ -197,5 +232,9 @@ func init() {
 	startCmd.Flags().StringVar(&annotation, "annotation", "", "Annotation message for the test session")
 	startCmd.Flags().StringVar(&version, "version", "1.0.0", "Version of the test session")
 	startCmd.Flags().StringVar(&buildResultsUrl, "buildResultsUrl", "", "URL to CI build results")
+
+	// Add flags for variables and deepLinks
+	startCmd.Flags().StringSliceVar(&variablesFlag, "variable", []string{}, "Set variables (name=value). Example: --variable key1=value1 --variable key2=value2")
+	startCmd.Flags().StringSliceVar(&deepLinksFlag, "deeplink", []string{}, "Add deep links (title|url). Example: --deeplink MyTitle|http://example.com")
 
 }

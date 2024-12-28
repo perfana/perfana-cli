@@ -12,6 +12,5 @@ type Configuration struct {
 		Enabled    bool   `yaml:"enabled"`
 		ClientCert string `yaml:"clientCert"` // Path to the client certificate
 		ClientKey  string `yaml:"clientKey"`  // Path to the client private key
-		CACert     string `yaml:"caCert"`
 	} `yaml:"mtls"`
 }
