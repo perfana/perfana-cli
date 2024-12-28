@@ -3,6 +3,7 @@ package perfana_client
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,46 +52,70 @@ type DeepLink struct {
 	PluginName string `json:"pluginName"`
 }
 
-// Config represents the configuration for Perfana API calls
-type Config struct {
-	Key              string `yaml:"key"`
-	ClientIdentifier string `yaml:"clientIdentifier"`
-	SystemUnderTest  string `yaml:"systemUnderTest"`
-	Environment      string `yaml:"environment"`
-	Workload         string `yaml:"workload"`
-	BaseURL          string `yaml:"baseUrl"`
-	MTLSCert         string `yaml:"-"` // Optional: mTLS certificate
-	MTLSKey          string `yaml:"-"` // Optional: mTLS private key
+// PerfanaClient is the client implementation for Perfana
+type PerfanaClient struct {
+	httpClient *http.Client
+	config     Configuration
 }
 
-// Client represents the Perfana Client that makes API calls
-type Client struct {
-	config Config
-	client *http.Client
-}
-
-// NewClient initializes a new Perfana client with the given configuration
-func NewClient(config Config) (*Client, error) {
-	if config.BaseURL == "" {
+// NewClient initializes and returns a Perfana client
+func NewClient(config Configuration) (*PerfanaClient, error) {
+	if config.BaseUrl == "" {
 		return nil, errors.New("baseUrl is required")
 	}
 
-	// Initialize an HTTP client (can include mTLS support if necessary)
-	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
+	if !config.MTLS.Enabled {
+		// Default HTTP Client
+		httpClient := &http.Client{
+			Timeout: 10 * time.Second,
+		}
+		return &PerfanaClient{
+			httpClient: httpClient,
+			config:     config,
+		}, nil
+	} else {
+		tlsClient, err := createTLSClient(config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TLS client: %w", err)
+		}
+		return &PerfanaClient{
+			httpClient: tlsClient,
+			config:     config,
+		}, nil
+	}
+}
+
+// createTLSClient sets up a HTTP client with mutual TLS
+func createTLSClient(config Configuration) (*http.Client, error) {
+	// Load client certificate and key from PEM strings
+	cert, err := tls.X509KeyPair([]byte(config.MTLS.ClientCert), []byte(config.MTLS.ClientKey))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load client certificate and key: %w", err)
 	}
 
-	return &Client{
-		config: config,
-		client: httpClient,
+	// Configure TLS
+	tlsConfig := &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: false, // Ensure certificate validation
+	}
+
+	// Create a transport with TLS configuration
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	// Return a client with the transport
+	return &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: transport,
 	}, nil
 }
 
 // Init performs a POST request to /api/init and starts a test run.
 // It sends systemUnderTest, environment, and workload in the JSON payload
 // and receives a testRunId in the response.
-func (c *Client) Init() (string, error) {
-	url := fmt.Sprintf("%s/api/init", c.config.BaseURL)
+func (c *PerfanaClient) Init() (string, error) {
+	url := fmt.Sprintf("%s/api/init", c.config.BaseUrl)
 
 	// Prepare the request body
 	reqBody, err := json.Marshal(map[string]string{
@@ -124,8 +149,8 @@ func (c *Client) Init() (string, error) {
 }
 
 // TestEvent makes a POST request to start a Perfana session
-func (c *Client) TestEvent(testRunID string, additionalData map[string]interface{}, completed bool) error {
-	url := fmt.Sprintf("%s/api/test", c.config.BaseURL)
+func (c *PerfanaClient) TestEvent(testRunID string, additionalData map[string]interface{}, completed bool) error {
+	url := fmt.Sprintf("%s/api/test", c.config.BaseUrl)
 
 	// Create the JSON payload (PerfanaMessage with additional fields as needed)
 	message := PerfanaMessage{
@@ -184,7 +209,7 @@ func (c *Client) TestEvent(testRunID string, additionalData map[string]interface
 }
 
 // Shared helper method for HTTP requests
-func (c *Client) makeRequest(method, url string, body io.Reader) ([]byte, error) {
+func (c *PerfanaClient) makeRequest(method, url string, body io.Reader) ([]byte, error) {
 
 	// Create a context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -195,10 +220,10 @@ func (c *Client) makeRequest(method, url string, body io.Reader) ([]byte, error)
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.config.Key)
+	req.Header.Set("Authorization", "Bearer "+c.config.ApiKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -222,8 +247,8 @@ func (c *Client) makeRequest(method, url string, body io.Reader) ([]byte, error)
 // sendPerfanaEvent sends a PerfanaEvent to the /api/events endpoint.
 // It returns an error if the request fails or if the response status is non-200,
 // along with the server response for non-200 statuses.
-func (c *Client) SendPerfanaEvent(event PerfanaEvent) (string, error) {
-	url := fmt.Sprintf("%s/api/events", c.config.BaseURL)
+func (c *PerfanaClient) SendPerfanaEvent(event PerfanaEvent) (string, error) {
+	url := fmt.Sprintf("%s/api/events", c.config.BaseUrl)
 
 	// Marshal the event struct into JSON
 	reqBody, err := json.Marshal(event)
@@ -242,11 +267,11 @@ func (c *Client) SendPerfanaEvent(event PerfanaEvent) (string, error) {
 	}
 
 	// Set headers
-	req.Header.Set("Authorization", "Bearer "+c.config.Key)
+	req.Header.Set("Authorization", "Bearer "+c.config.ApiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	// Perform the request
-	resp, err := c.client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute request: %v", err)
 	}

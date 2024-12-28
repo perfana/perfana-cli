@@ -19,24 +19,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"perfana-cli/perfana_client"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
-
-// Configuration struct to represent the YAML structure
-type Configuration struct {
-	Key              string `yaml:"key"`
-	BaseUrl          string `yaml:"baseUrl"`
-	ClientIdentifier string `yaml:"clientIdentifier"`
-	SystemUnderTest  string `yaml:"systemUnderTest"`
-	Environment      string `yaml:"environment"`
-	Workload         string `yaml:"workload"`
-	MTLS             struct {
-		Cert string `yaml:"cert"`
-		Key  string `yaml:"key"`
-	} `yaml:"mtls"`
-}
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
@@ -63,16 +50,16 @@ var initCmd = &cobra.Command{
 		configFile := filepath.Join(perfanaDir, "perfana.yaml")
 
 		// Initialize default configuration
-		config := Configuration{
-			Key:              "your-api-key",
+		config := perfana_client.Configuration{
+			ApiKey:           "your-api-key",
 			BaseUrl:          "http://localhost:4000",
 			ClientIdentifier: "your-client-identifier",
 			SystemUnderTest:  "your-system-under-test",
 			Environment:      "your-environment",
 			Workload:         "your-workload",
 		}
-		config.MTLS.Key = "-----BEGIN PRIVATE KEY-----\n<your-private-key-here>\n-----END PRIVATE KEY-----"
-		config.MTLS.Cert = "-----BEGIN CERTIFICATE-----\n<your-cert-here>\n-----END CERTIFICATE-----"
+		config.MTLS.ClientKey = "-----BEGIN PRIVATE KEY-----\n<your-private-key-here, mind indentation>\n-----END PRIVATE KEY-----"
+		config.MTLS.ClientCert = "-----BEGIN CERTIFICATE-----\n<your-cert-here, mind indentation>\n-----END CERTIFICATE-----"
 
 		// Read flags
 		clientIdentifier, _ := cmd.Flags().GetString("clientIdentifier")
@@ -80,8 +67,9 @@ var initCmd = &cobra.Command{
 		systemUnderTest, _ := cmd.Flags().GetString("systemUnderTest")
 		environment, _ := cmd.Flags().GetString("environment")
 		workload, _ := cmd.Flags().GetString("workload")
-		certPath, _ := cmd.Flags().GetString("certPath")
-		keyPath, _ := cmd.Flags().GetString("keyPath")
+		clientCertPath, _ := cmd.Flags().GetString("clientCertPath")
+		clientKeyPath, _ := cmd.Flags().GetString("clientKeyPath")
+		apiKey, _ := cmd.Flags().GetString("apiKey")
 
 		// Update configuration values if flags are present
 		if clientIdentifier != "" {
@@ -99,22 +87,36 @@ var initCmd = &cobra.Command{
 		if workload != "" {
 			config.Workload = workload
 		}
-		if certPath != "" {
-			certData, err := os.ReadFile(certPath)
+		if apiKey != "" {
+			config.ApiKey = apiKey
+		}
+		// only enable when certs are present
+		certPresent := false
+		keyPresent := false
+		if clientCertPath != "" {
+			certData, err := os.ReadFile(clientCertPath)
 			if err != nil {
-				fmt.Printf("Error reading certificate file %s: %s\n", certPath, err)
+				fmt.Printf("Error reading certificate file %s: %s\n", clientCertPath, err)
 				return
 			}
-			config.MTLS.Cert = string(certData)
+			config.MTLS.ClientCert = string(certData)
+			certPresent = true
 		}
-		if keyPath != "" {
-			keyData, err := os.ReadFile(keyPath)
+		if clientKeyPath != "" {
+			keyData, err := os.ReadFile(clientKeyPath)
 			if err != nil {
-				fmt.Printf("Error reading private key file %s: %s\n", keyPath, err)
+				fmt.Printf("Error reading private key file %s: %s\n", clientKeyPath, err)
 				return
 			}
-			config.MTLS.Key = string(keyData)
+			config.MTLS.ClientKey = string(keyData)
+			keyPresent = true
 		}
+		if (certPresent && !keyPresent) || (!certPresent && keyPresent) {
+			fmt.Println("Both client certificate and private key must be provided for mTLS")
+			return
+		}
+		fmt.Printf("mTLS enabled: %t\n", certPresent && keyPresent)
+		config.MTLS.Enabled = certPresent && keyPresent
 
 		// Marshal configuration into YAML format
 		data, err := yaml.Marshal(&config)
@@ -139,9 +141,10 @@ func init() {
 	// Add flags for optional customization
 	initCmd.Flags().String("clientIdentifier", "", "Client identifier for Perfana configuration")
 	initCmd.Flags().String("baseUrl", "", "Base URL to use for calling Perfana, e.g. http://localhost:4000")
+	initCmd.Flags().String("apiKey", "", "Perfana API key")
 	initCmd.Flags().String("systemUnderTest", "", "System under test for Perfana configuration")
 	initCmd.Flags().String("environment", "", "Environment for Perfana configuration")
 	initCmd.Flags().String("workload", "", "Workload for Perfana configuration")
-	initCmd.Flags().String("certPath", "", "Path to PEM-encoded certificate file for mTLS")
-	initCmd.Flags().String("keyPath", "", "Path to PEM-encoded private key file for mTLS")
+	initCmd.Flags().String("clientCertPath", "", "Path to PEM-encoded certificate file for mTLS")
+	initCmd.Flags().String("clientKeyPath", "", "Path to PEM-encoded private key file for mTLS")
 }

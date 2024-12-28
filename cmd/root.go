@@ -27,10 +27,9 @@ var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "perfana",
-	Short: "Use Perfana via the Command Line Interface",
-	Long: `Perfana CLI - A command line interface to interact with Perfana Cloud 
-or Perfana Local for managing load tests and configurations.`,
+	Use:   "perfana-cli",
+	Short: "Use Perfana	a via the Command Line Interface",
+	Long:  `Perfana CLI - A command line interface to interact with Perfana Cloud or Perfana Local for managing load tests and configurations.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },

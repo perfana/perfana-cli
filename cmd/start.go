@@ -61,7 +61,7 @@ var startCmd = &cobra.Command{
 		}
 
 		// Parse the YAML configuration
-		var config perfana_client.Config
+		var config perfana_client.Configuration
 		err = yaml.Unmarshal(file, &config)
 		if err != nil {
 			fmt.Printf("Error parsing configuration file: %v\n", err)
