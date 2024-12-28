@@ -188,7 +188,7 @@ var startCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(startCmd)
+	runCmd.AddCommand(startCmd)
 
 	// Add flags to the startCmd
 	startCmd.Flags().StringVar(&rampupTime, "rampupTime", "PT5m", "Ramp-up time period in ISO8601 format (e.g., PT5m for 5 minutes)")
