@@ -1,0 +1,39 @@
+name: build perfana-cli
+
+on:
+  push:
+    tags:
+      - perfana-cli-*
+
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22.9
+
+      - name: Build
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o perfana-cli-linux-amd64 main.go 
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o perfana-cli-linux-arm64 main.go 
+          GOOS=windows GOARCH=386 go build -o perfana-cli-windows-386.exe main.go
+          GOOS=windows GOARCH=amd64 go build -o perfana-cli-windows-amd64.exe main.go
+          GOOS=darwin GOARCH=amd64 go build -o perfana-cli-macos-amd64 main.go
+          GOOS=darwin GOARCH=arm64 go build -o perfana-cli-macos-arm64 main.go
+
+      - uses: olegtarasov/get-tag@v2.1.3
+        id: tagName
+
+      - uses: ncipollo/release-action@v1.14.0
+        with:
+          artifacts: "perfana-cli-*"
+          body: "Release ${{ steps.tagName.outputs.tag }}"
