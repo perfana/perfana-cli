@@ -1,0 +1,34 @@
+// Example: Running perfana-cli in Jenkins
+//
+// Prerequisites:
+//   - Install perfana-cli on the Jenkins agent, or use the Docker image
+//   - Store PERFANA_API_KEY as a Jenkins credential (secret text)
+//   - Place your perfana.yaml in the repository root
+
+pipeline {
+    agent any
+
+    environment {
+        PERFANA_API_KEY = credentials('perfana-api-key')
+    }
+
+    stages {
+        stage('Validate Config') {
+            steps {
+                sh 'perfana-cli validate --config perfana.yaml'
+            }
+        }
+
+        stage('Run Performance Test') {
+            steps {
+                sh 'perfana-cli run start --config perfana.yaml'
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Performance test completed'
+        }
+    }
+}

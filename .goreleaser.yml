@@ -1,0 +1,106 @@
+version: 2
+
+project_name: perfana-cli
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: .
+    binary: perfana-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X perfana-cli/cmd.version={{.Version}}
+      - -X perfana-cli/cmd.commit={{.Commit}}
+      - -X perfana-cli/cmd.date={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+brews:
+  - repository:
+      owner: perfana
+      name: homebrew-tap
+    directory: Formula
+    homepage: "https://perfana.io"
+    description: "CLI tool for orchestrating performance tests with Perfana"
+    license: "Apache-2.0"
+    test: |
+      system "#{bin}/perfana-cli", "version"
+    install: |
+      bin.install "perfana-cli"
+
+scoops:
+  - repository:
+      owner: perfana
+      name: scoop-bucket
+    homepage: "https://perfana.io"
+    description: "CLI tool for orchestrating performance tests with Perfana"
+    license: "Apache-2.0"
+
+dockers:
+  - image_templates:
+      - "perfana/perfana-cli:{{ .Version }}-amd64"
+      - "perfana/perfana-cli:latest-amd64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    dockerfile: Dockerfile
+    goarch: amd64
+  - image_templates:
+      - "perfana/perfana-cli:{{ .Version }}-arm64"
+      - "perfana/perfana-cli:latest-arm64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    dockerfile: Dockerfile
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "perfana/perfana-cli:{{ .Version }}"
+    image_templates:
+      - "perfana/perfana-cli:{{ .Version }}-amd64"
+      - "perfana/perfana-cli:{{ .Version }}-arm64"
+  - name_template: "perfana/perfana-cli:latest"
+    image_templates:
+      - "perfana/perfana-cli:latest-amd64"
+      - "perfana/perfana-cli:latest-arm64"
+
+release:
+  github:
+    owner: perfana
+    name: perfana-cli
+  draft: false
+  prerelease: auto

@@ -1,0 +1,20 @@
+# Example: Running perfana-cli in GitLab CI
+#
+# Prerequisites:
+#   - Set PERFANA_API_KEY as a CI/CD variable (masked)
+#   - Place your perfana.yaml in the repository root
+
+stages:
+  - performance
+
+performance-test:
+  stage: performance
+  image: perfana/perfana-cli:latest
+  variables:
+    PERFANA_API_KEY: $PERFANA_API_KEY
+  script:
+    - perfana-cli validate --config perfana.yaml
+    - perfana-cli run start --config perfana.yaml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"

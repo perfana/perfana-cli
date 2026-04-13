@@ -1,0 +1,26 @@
+# Example: Running perfana-cli in GitHub Actions
+#
+# Prerequisites:
+#   - Set PERFANA_API_KEY as a repository secret
+#   - Place your perfana.yaml in the repository root
+
+name: Performance Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 1-5" # Weekdays at 2am
+
+jobs:
+  perfana-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run performance test
+        uses: perfana/perfana-cli-action@v1
+        with:
+          command: "run start"
+          config: "perfana.yaml"
+        env:
+          PERFANA_API_KEY: ${{ secrets.PERFANA_API_KEY }}

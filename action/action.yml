@@ -1,0 +1,49 @@
+name: "Perfana CLI Action"
+description: "Run performance tests with Perfana CLI"
+branding:
+  icon: "activity"
+  color: "blue"
+
+inputs:
+  version:
+    description: "Version of perfana-cli to install (e.g. v1.0.0). Defaults to latest."
+    required: false
+    default: "latest"
+  config:
+    description: "Path to perfana.yaml config file"
+    required: false
+    default: "perfana.yaml"
+  command:
+    description: "Command to run (e.g. 'run start', 'validate', 'migrate')"
+    required: true
+  args:
+    description: "Additional arguments to pass to perfana-cli"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install perfana-cli
+      shell: bash
+      env:
+        CLI_VERSION: ${{ inputs.version }}
+      run: |
+        if [ "$CLI_VERSION" = "latest" ]; then
+          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/perfana/perfana-cli/releases/latest \
+            | grep "browser_download_url.*linux_amd64.tar.gz" \
+            | cut -d '"' -f 4)
+        else
+          DOWNLOAD_URL="https://github.com/perfana/perfana-cli/releases/download/${CLI_VERSION}/perfana-cli_${CLI_VERSION#v}_linux_amd64.tar.gz"
+        fi
+        curl -sL "$DOWNLOAD_URL" | tar xz -C /usr/local/bin perfana-cli
+        chmod +x /usr/local/bin/perfana-cli
+
+    - name: Run perfana-cli
+      shell: bash
+      env:
+        PERFANA_CONFIG: ${{ inputs.config }}
+        PERFANA_COMMAND: ${{ inputs.command }}
+        PERFANA_ARGS: ${{ inputs.args }}
+      run: |
+        perfana-cli --config "$PERFANA_CONFIG" $PERFANA_COMMAND $PERFANA_ARGS

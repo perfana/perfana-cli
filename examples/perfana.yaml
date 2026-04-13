@@ -1,0 +1,54 @@
+# Example perfana.yaml configuration
+# See https://github.com/perfana/perfana-cli for full documentation
+
+perfana:
+  apiKey: "${PERFANA_API_KEY}"
+  baseUrl: "https://perfana.example.com"
+  # Optional mTLS configuration
+  # mtls:
+  #   clientKeyPath: "/path/to/key.pem"
+  #   clientCertPath: "/path/to/cert.pem"
+
+test:
+  systemUnderTest: "MyApp"
+  environment: "loadtest"
+  workload: "peak-hours"
+  version: "1.0.0"
+  rampupTime: "PT2M"
+  constantLoadTime: "PT15M"
+  tags:
+    - "nightly"
+  annotations: "Nightly peak-hour simulation"
+  deepLinks:
+    - name: "Grafana"
+      url: "https://grafana.example.com/d/abc"
+  variables:
+    - placeholder: "__region__"
+      value: "eu-west-1"
+
+scheduler:
+  enabled: true
+  failOnError: true
+  keepAliveIntervalSeconds: 30
+  scheduleScript: |
+    PT30S|scale-up(scale to 3)|name=k8sScaler;replicas=3
+    PT10M|scale-down(scale to 1)|name=k8sScaler;replicas=1
+
+events:
+  - name: "load-runner"
+    type: command
+    continueOnKeepAliveParticipant: true
+    commands:
+      onBeforeTest: "echo Preparing test environment"
+      onStartTest: "k6 run /tests/load-test.js"
+      onKeepAlive: "pgrep k6"
+      onAbort: "pkill k6"
+      onAfterTest: "echo Test completed"
+
+  - name: "git-info"
+    type: config-collector
+    command: "git log -1 --format='%H'"
+    output: key
+    key: "git-commit"
+    tags:
+      - "GitHub"

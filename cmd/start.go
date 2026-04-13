@@ -35,7 +35,7 @@ var (
 	constantLoadTime string
 	tags             string
 	annotation       string
-	version          string
+	testVersion      string
 	buildResultsUrl  string
 	variablesFlag    []string
 	deepLinksFlag    []string
@@ -112,7 +112,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			SystemUnderTest: config.SystemUnderTest,
 			Environment:     config.Environment,
 			Workload:        config.Workload,
-			Version:         version,
+			Version:         testVersion,
 			Tags:            tagList,
 			Variables:       variables,
 			Client:          client,
@@ -144,7 +144,7 @@ func init() {
 	startCmd.Flags().StringVar(&constantLoadTime, "constantLoadTime", "PT15M", "Constant load time in ISO8601 format (e.g., PT15M for 15 minutes)")
 	startCmd.Flags().StringVar(&tags, "tags", "k6,jfr", "Comma-separated tags for the test session")
 	startCmd.Flags().StringVar(&annotation, "annotation", "", "Annotation message for the test session")
-	startCmd.Flags().StringVar(&version, "version", "1.0.0", "Version of the test session")
+	startCmd.Flags().StringVar(&testVersion, "version", "1.0.0", "Version of the test session")
 	startCmd.Flags().StringVar(&buildResultsUrl, "buildResultsUrl", "", "URL to CI build results")
 	startCmd.Flags().StringSliceVar(&variablesFlag, "variable", []string{}, "Set variables (name=value). Example: --variable key1=value1 --variable key2=value2")
 	startCmd.Flags().StringSliceVar(&deepLinksFlag, "deeplink", []string{}, "Add deep links (title|url). Example: --deeplink MyTitle|http://example.com")
