@@ -286,6 +286,90 @@ func (c *PerfanaClient) GetTestRunStatus(testRunID string) (string, error) {
 	return string(resp), nil
 }
 
+// ConfigKeyRequest represents a single key-value config upload.
+type ConfigKeyRequest struct {
+	TestRunID string `json:"testRunId"`
+	Key       string `json:"key"`
+	Value     string `json:"value"`
+	Tags      []string `json:"tags,omitempty"`
+}
+
+// ConfigKeysRequest represents a multi key-value config upload.
+type ConfigKeysRequest struct {
+	TestRunID   string       `json:"testRunId"`
+	ConfigItems []ConfigItem `json:"configItems"`
+	Tags        []string     `json:"tags,omitempty"`
+}
+
+// ConfigItem is a single key-value pair for config upload.
+type ConfigItem struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// ConfigJSONRequest represents a JSON config upload with regex filters.
+type ConfigJSONRequest struct {
+	TestRunID string      `json:"testRunId"`
+	JSON      interface{} `json:"json"`
+	Includes  []string    `json:"includes,omitempty"`
+	Excludes  []string    `json:"excludes,omitempty"`
+	Tags      []string    `json:"tags,omitempty"`
+}
+
+// SendConfigKey uploads a single key-value config to Perfana.
+func (c *PerfanaClient) SendConfigKey(testRunID, key, value string, tags []string) error {
+	url := fmt.Sprintf("%s/api/config/key", c.config.BaseUrl)
+
+	reqBody, err := json.Marshal(ConfigKeyRequest{
+		TestRunID: testRunID,
+		Key:       key,
+		Value:     value,
+		Tags:      tags,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal config key request: %w", err)
+	}
+
+	_, err = c.makeRequest("POST", url, bytes.NewReader(reqBody))
+	return err
+}
+
+// SendConfigKeys uploads multiple key-value configs to Perfana.
+func (c *PerfanaClient) SendConfigKeys(testRunID string, items []ConfigItem, tags []string) error {
+	url := fmt.Sprintf("%s/api/config/keys", c.config.BaseUrl)
+
+	reqBody, err := json.Marshal(ConfigKeysRequest{
+		TestRunID:   testRunID,
+		ConfigItems: items,
+		Tags:        tags,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal config keys request: %w", err)
+	}
+
+	_, err = c.makeRequest("POST", url, bytes.NewReader(reqBody))
+	return err
+}
+
+// SendConfigJSON uploads JSON config with regex filters to Perfana.
+func (c *PerfanaClient) SendConfigJSON(testRunID string, jsonData interface{}, includes, excludes, tags []string) error {
+	url := fmt.Sprintf("%s/api/config/json", c.config.BaseUrl)
+
+	reqBody, err := json.Marshal(ConfigJSONRequest{
+		TestRunID: testRunID,
+		JSON:      jsonData,
+		Includes:  includes,
+		Excludes:  excludes,
+		Tags:      tags,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal config json request: %w", err)
+	}
+
+	_, err = c.makeRequest("POST", url, bytes.NewReader(reqBody))
+	return err
+}
+
 // sendPerfanaEvent sends a PerfanaEvent to the /api/events endpoint.
 // It returns an error if the request fails or if the response status is non-200,
 // along with the server response for non-200 statuses.
