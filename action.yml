@@ -33,11 +33,22 @@ runs:
           DOWNLOAD_URL=$(curl -s https://api.github.com/repos/perfana/perfana-cli/releases/latest \
             | grep "browser_download_url.*linux_amd64.tar.gz" \
             | cut -d '"' -f 4)
+          CHECKSUM_URL=$(curl -s https://api.github.com/repos/perfana/perfana-cli/releases/latest \
+            | grep "browser_download_url.*checksums.txt" \
+            | cut -d '"' -f 4)
         else
           DOWNLOAD_URL="https://github.com/perfana/perfana-cli/releases/download/${CLI_VERSION}/perfana-cli_${CLI_VERSION#v}_linux_amd64.tar.gz"
+          CHECKSUM_URL="https://github.com/perfana/perfana-cli/releases/download/${CLI_VERSION}/checksums.txt"
         fi
-        curl -sL "$DOWNLOAD_URL" | tar xz -C /usr/local/bin perfana-cli
+        TMPDIR=$(mktemp -d)
+        curl -sL "$DOWNLOAD_URL" -o "$TMPDIR/perfana-cli.tar.gz"
+        curl -sL "$CHECKSUM_URL" -o "$TMPDIR/checksums.txt"
+        cd "$TMPDIR"
+        grep "linux_amd64.tar.gz" checksums.txt | sha256sum -c -
+        tar xzf perfana-cli.tar.gz perfana-cli
+        mv perfana-cli /usr/local/bin/perfana-cli
         chmod +x /usr/local/bin/perfana-cli
+        rm -rf "$TMPDIR"
 
     - name: Run perfana-cli
       shell: bash

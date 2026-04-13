@@ -36,20 +36,6 @@ perfana-cli init \
   --workload loadTest
 ```
 
-For mTLS (Perfana Cloud), add certificate paths:
-
-```bash
-perfana-cli init \
-  --baseUrl https://acme.perfana.cloud \
-  --clientIdentifier acme \
-  --clientKeyPath /path/to/tls.key \
-  --clientCertPath /path/to/tls.crt \
-  --apiKey "$PERFANA_API_KEY" \
-  --systemUnderTest my-service \
-  --environment test \
-  --workload loadTest
-```
-
 Start a test run:
 
 ```bash
@@ -126,6 +112,64 @@ events:
 
 Generate a fully annotated template with `perfana-cli init-project`.
 
+## GitHub Action
+
+Use `perfana/perfana-cli` directly in your GitHub Actions workflows:
+
+```yaml
+- name: Run Perfana test
+  uses: perfana/perfana-cli@v0.1.0
+  env:
+    PERFANA_API_KEY: ${{ secrets.PERFANA_API_KEY }}
+  with:
+    command: run start
+    config: perfana.yaml
+    args: --rampupTime=PT5M --constantLoadTime=PT15M
+```
+
+### Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `command` | Yes | — | Command to run (e.g. `run start`, `validate`, `migrate`) |
+| `config` | No | `perfana.yaml` | Path to perfana.yaml config file |
+| `version` | No | `latest` | Version of perfana-cli to install (e.g. `v0.1.0`) |
+| `args` | No | — | Additional arguments to pass to perfana-cli |
+
+### Example: validate config on PRs, run tests on main
+
+```yaml
+name: Performance Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: perfana/perfana-cli@v0.1.0
+        with:
+          command: validate
+
+  test:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: perfana/perfana-cli@v0.1.0
+        env:
+          PERFANA_API_KEY: ${{ secrets.PERFANA_API_KEY }}
+        with:
+          command: run start
+          args: --tags="ci,nightly" --version="${{ github.sha }}"
+```
+
 ## Migrating from Maven
 
 If you have an existing `pom.xml` with `event-scheduler-maven-plugin` configuration:
@@ -145,7 +189,6 @@ This converts the Maven plugin config (event configs, property references, durat
 ## What it is not
 
 - A replacement for `x2i` (used to send load data metrics to Perfana)
-- A substitute for a production-grade `perfana-secure-gateway`
 - A load generator
 
 ## License
