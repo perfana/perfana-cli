@@ -147,4 +147,104 @@ func init() {
 	initCmd.Flags().String("workload", "", "Workload for Perfana configuration")
 	initCmd.Flags().String("clientCertPath", "", "Path to PEM-encoded certificate file for mTLS")
 	initCmd.Flags().String("clientKeyPath", "", "Path to PEM-encoded private key file for mTLS")
+	initCmd.Flags().Bool("project", false, "Generate project-level ./perfana.yaml with full annotated template")
+
+	initProjectCmd.Flags().Bool("force", false, "Overwrite existing perfana.yaml")
+	rootCmd.AddCommand(initProjectCmd)
 }
+
+// initProjectCmd generates a full annotated perfana.yaml in the current directory
+var initProjectCmd = &cobra.Command{
+	Use:   "init-project",
+	Short: "Generate annotated perfana.yaml template in current directory",
+	Long:  `Creates a fully annotated perfana.yaml template with example events, scheduler config, and inline documentation.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		outputPath := "perfana.yaml"
+		if _, err := os.Stat(outputPath); err == nil {
+			fmt.Printf("%s already exists. Use --force to overwrite.\n", outputPath)
+			force, _ := cmd.Flags().GetBool("force")
+			if !force {
+				return
+			}
+		}
+
+		template := `# perfana.yaml — Perfana CLI configuration
+# Documentation: https://github.com/perfana/perfana-cli
+
+# Perfana server connection
+perfana:
+  apiKey: "${PERFANA_API_KEY}"          # Set via environment variable
+  baseUrl: "https://perfana.example.com"
+  # mtls:                               # Optional mutual TLS
+  #   clientKeyPath: "/path/to/key.pem"
+  #   clientCertPath: "/path/to/cert.pem"
+
+# Test run configuration
+test:
+  systemUnderTest: "my-application"     # Name of the system being tested
+  environment: "loadtest"               # Test environment name
+  workload: "peak-hours"                # Workload profile name
+  version: "1.0.0"                      # Application version
+  rampupTime: "PT2M"                    # Ramp-up duration (ISO 8601)
+  constantLoadTime: "PT15M"             # Constant load duration (ISO 8601)
+  tags:
+    - "nightly"
+    - "regression"
+  annotations: ""                       # Optional test annotation
+  # deepLinks:                          # Optional links shown in Perfana UI
+  #   - name: "Grafana"
+  #     url: "https://grafana.example.com/d/abc"
+  # variables:                          # Custom variables for command substitution
+  #   - placeholder: "__region__"
+  #     value: "eu-west-1"
+
+# Event scheduler settings
+scheduler:
+  enabled: true
+  failOnError: true
+  keepAliveIntervalSeconds: 30          # Keep-alive interval (must be < 120s stale timeout)
+  # scheduleScript: |                   # Timed events during the test
+  #   PT30S|scale-up(scale to 3)|name=k8sScaler;replicas=3
+  #   PT10M|scale-down(scale to 1)|name=k8sScaler;replicas=1
+
+# Event definitions
+events:
+  # Command event: executes shell commands at lifecycle hooks
+  - name: "load-runner"
+    type: command
+    continueOnKeepAliveParticipant: true  # Signal test done when onKeepAlive exits non-zero
+    commands:
+      onBeforeTest: "echo Preparing test environment"
+      onStartTest: "k6 run ./test.js"    # Your load test command
+      onKeepAlive: "pgrep -x k6"         # Check if load test is still running
+      onAbort: "pkill -x k6"             # Kill load test on abort
+      onAfterTest: "echo Test completed"
+
+  # Config collector: capture metadata and upload to Perfana
+  - name: "git-info"
+    type: config-collector
+    command: "git log -1 --format='%H'"   # Command to execute
+    output: key                            # Output mode: key, keys, or json
+    key: "git-commit"                      # Key name (for output=key)
+    tags:
+      - "source-control"
+
+  # Example: collect Kubernetes deployment info as JSON
+  # - name: "k8s-config"
+  #   type: config-collector
+  #   command: "kubectl get deployment myapp -o json"
+  #   output: json
+  #   includes: ["spec\\.replicas", "spec\\.template\\.spec\\.containers"]
+  #   excludes: ["metadata\\.managedFields"]
+  #   tags:
+  #     - "kubernetes"
+`
+
+		if err := os.WriteFile(outputPath, []byte(template), 0644); err != nil {
+			fmt.Printf("Error writing %s: %v\n", outputPath, err)
+			os.Exit(1)
+		}
+		fmt.Printf("Created %s with annotated template\n", outputPath)
+	},
+}
+
