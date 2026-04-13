@@ -19,6 +19,16 @@ type MavenProject struct {
 	XMLName    xml.Name        `xml:"project"`
 	Properties MavenProperties `xml:"properties"`
 	Build      MavenBuild      `xml:"build"`
+	Profiles   MavenProfiles   `xml:"profiles"`
+}
+
+type MavenProfiles struct {
+	Profile []MavenProfile `xml:"profile"`
+}
+
+type MavenProfile struct {
+	ID         string          `xml:"id"`
+	Properties MavenProperties `xml:"properties"`
 }
 
 type MavenProperties struct {
@@ -230,7 +240,7 @@ func runMigrate(inputPath, outputPath string) error {
 
 	// Process the first pom.xml that has eventSchedulerConfig
 	for _, pomPath := range pomPaths {
-		migrated, warnings, err := migratePom(pomPath)
+		migrated, warnings, profiles, err := migratePom(pomPath)
 		if err != nil {
 			log.Printf("Skipping %s: %v", pomPath, err)
 			continue
@@ -254,6 +264,25 @@ func runMigrate(inputPath, outputPath string) error {
 		}
 
 		log.Printf("Migration complete: %s → %s", pomPath, outputPath)
+
+		// Write profile .env files
+		if len(profiles) > 0 {
+			outputDir := filepath.Dir(outputPath)
+			profileDir := filepath.Join(outputDir, "profiles")
+			if err := os.MkdirAll(profileDir, 0755); err != nil {
+				log.Printf("Warning: could not create profiles directory: %v", err)
+			} else {
+				for profileID, envVars := range profiles {
+					envPath := filepath.Join(profileDir, profileID+".env")
+					if err := os.WriteFile(envPath, []byte(envVars), 0644); err != nil {
+						log.Printf("Warning: could not write %s: %v", envPath, err)
+					} else {
+						log.Printf("Profile: %s", envPath)
+					}
+				}
+			}
+		}
+
 		if len(warnings) > 0 {
 			log.Printf("Warnings (%d):", len(warnings))
 			for _, w := range warnings {
@@ -266,15 +295,15 @@ func runMigrate(inputPath, outputPath string) error {
 	return fmt.Errorf("no valid eventSchedulerConfig found in any pom.xml")
 }
 
-func migratePom(pomPath string) (*MigratedConfig, []string, error) {
+func migratePom(pomPath string) (*MigratedConfig, []string, map[string]string, error) {
 	data, err := os.ReadFile(pomPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read %s: %w", pomPath, err)
+		return nil, nil, nil, fmt.Errorf("failed to read %s: %w", pomPath, err)
 	}
 
 	var project MavenProject
 	if err := xml.Unmarshal(data, &project); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse XML: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to parse XML: %w", err)
 	}
 
 	// Build property map for resolving ${property} references
@@ -283,40 +312,77 @@ func migratePom(pomPath string) (*MigratedConfig, []string, error) {
 		props[p.XMLName.Local] = p.Value
 	}
 
-	// Find the event-scheduler-maven-plugin
+	// Detect properties overridden by profiles — these become env vars
+	profileOverrides := make(map[string]bool)
+	profileProps := make(map[string]map[string]string) // profileID -> propName -> value
+	for _, profile := range project.Profiles.Profile {
+		pProps := make(map[string]string)
+		for _, p := range profile.Properties.Values {
+			profileOverrides[p.XMLName.Local] = true
+			pProps[p.XMLName.Local] = p.Value
+		}
+		if len(pProps) > 0 {
+			profileProps[profile.ID] = pProps
+		}
+	}
+
+	if len(profileOverrides) > 0 {
+		var names []string
+		for name := range profileOverrides {
+			names = append(names, name)
+		}
+		log.Printf("Profile-overridden properties (will use env vars): %s", strings.Join(names, ", "))
+	}
+
+	// Find any plugin that contains an eventSchedulerConfig
+	// This matches event-scheduler-maven-plugin, events-jmeter-maven-plugin,
+	// events-gatling-maven-plugin, and other Perfana event plugins.
 	var esc *MavenEventSchedulerConfig
 	for _, plugin := range project.Build.Plugins.Plugin {
-		if plugin.ArtifactID == "event-scheduler-maven-plugin" {
+		if plugin.Configuration.EventSchedulerConfig.TestConfig.SystemUnderTest != "" ||
+			len(plugin.Configuration.EventSchedulerConfig.EventConfigs.EventConfig) > 0 {
 			esc = &plugin.Configuration.EventSchedulerConfig
 			break
 		}
 	}
 
 	if esc == nil {
-		return nil, nil, fmt.Errorf("no event-scheduler-maven-plugin found")
+		return nil, nil, nil, fmt.Errorf("no eventSchedulerConfig found in any plugin")
 	}
 
 	var warnings []string
 
-	// Resolve Maven property references
+	// Resolve Maven property references.
+	// Properties overridden by profiles are converted to env var references
+	// instead of being resolved to their default values.
 	resolve := func(val string) string {
-		resolved, w := resolveMavenProperty(val, props)
+		resolved, w := resolveMavenProperty(val, props, profileOverrides)
 		warnings = append(warnings, w...)
 		return resolved
 	}
 
-	// Convert test config
-	rampupSec := parseIntOrZero(resolve(esc.TestConfig.RampupTimeInSeconds))
-	constantSec := parseIntOrZero(resolve(esc.TestConfig.ConstantLoadTimeInSeconds))
-	keepAliveSec := parseIntOrZero(resolve(esc.KeepAliveIntervalSeconds))
+	// Convert test config — durations may be env var references from profiles
+	rampupResolved := resolve(esc.TestConfig.RampupTimeInSeconds)
+	constantResolved := resolve(esc.TestConfig.ConstantLoadTimeInSeconds)
+	keepAliveResolved := resolve(esc.KeepAliveIntervalSeconds)
+
+	// Convert seconds to ISO 8601, but keep env var references as-is
+	rampupTime := convertDuration(rampupResolved)
+	constantLoadTime := convertDuration(constantResolved)
+	keepAliveSec := parseIntOrZero(keepAliveResolved)
 
 	tagStr := resolve(esc.TestConfig.Tags)
 	var tagList []string
 	if tagStr != "" {
-		for _, t := range strings.Split(tagStr, ",") {
-			t = strings.TrimSpace(t)
-			if t != "" {
-				tagList = append(tagList, t)
+		// If tags resolved to an env var reference, keep as single entry
+		if strings.Contains(tagStr, "${") {
+			tagList = []string{tagStr}
+		} else {
+			for _, t := range strings.Split(tagStr, ",") {
+				t = strings.TrimSpace(t)
+				if t != "" {
+					tagList = append(tagList, t)
+				}
 			}
 		}
 	}
@@ -347,8 +413,8 @@ func migratePom(pomPath string) (*MigratedConfig, []string, error) {
 			Environment:      resolve(esc.TestConfig.TestEnvironment),
 			Workload:         resolve(esc.TestConfig.Workload),
 			Version:          resolve(esc.TestConfig.Version),
-			RampupTime:       secondsToISO8601(rampupSec),
-			ConstantLoadTime: secondsToISO8601(constantSec),
+			RampupTime:       rampupTime,
+			ConstantLoadTime: constantLoadTime,
 			Tags:             tagList,
 			Annotations:      resolve(esc.TestConfig.Annotations),
 		},
@@ -420,12 +486,56 @@ func migratePom(pomPath string) (*MigratedConfig, []string, error) {
 		}
 	}
 
-	return migrated, warnings, nil
+	// Properties that represent durations in seconds — convert to ISO 8601 in .env files
+	durationProps := map[string]bool{
+		"rampupTimeInSeconds":           true,
+		"constantLoadTimeInSeconds":     true,
+		"durationInSeconds":             true,
+		"excludeRampUpTimeFromAnalysis": true,
+		"jmeterRampup":                 true,
+		"jmeterHold":                   true,
+		"k6Rampup":                     true,
+		"k6Hold":                       true,
+		"k6Rampdown":                   true,
+	}
+
+	// Generate profile .env files
+	envFiles := make(map[string]string)
+	for profileID, pProps := range profileProps {
+		var lines []string
+		lines = append(lines, "# Profile: "+profileID)
+		lines = append(lines, "# Source: perfana-cli migrate from Maven profile")
+		lines = append(lines, "#")
+		lines = append(lines, "# Usage: source profiles/"+profileID+".env && perfana-cli run start")
+		lines = append(lines, "")
+		for propName, propValue := range pProps {
+			envVar := camelToUpperSnake(propName)
+			value := propValue
+			// Convert duration seconds to ISO 8601
+			if durationProps[propName] {
+				sec := parseIntOrZero(propValue)
+				if sec > 0 {
+					value = secondsToISO8601(sec)
+				}
+			}
+			// Flag values with unresolved Maven cross-references
+			if strings.Contains(value, "${") {
+				lines = append(lines, "# TODO: contains Maven references — set manually")
+			}
+			lines = append(lines, envVar+"="+value)
+		}
+		lines = append(lines, "")
+		envFiles[profileID] = strings.Join(lines, "\n")
+	}
+
+	return migrated, warnings, envFiles, nil
 }
 
 // resolveMavenProperty resolves ${property} references against the property map.
+// Properties in profileOverrides are converted to env var references (${UPPER_SNAKE})
+// instead of being resolved to their default values.
 // Returns the resolved value and any warnings for unresolvable references.
-func resolveMavenProperty(val string, props map[string]string) (string, []string) {
+func resolveMavenProperty(val string, props map[string]string, profileOverrides map[string]bool) (string, []string) {
 	var warnings []string
 	result := val
 
@@ -439,22 +549,91 @@ func resolveMavenProperty(val string, props map[string]string) (string, []string
 
 		propName := result[start+2 : end]
 
-		// Check if it's an ENV reference
+		// Check if it's an ENV reference (Maven ${env.VAR} → shell ${VAR})
 		if strings.HasPrefix(propName, "ENV.") || strings.HasPrefix(propName, "env.") {
 			envVar := propName[4:]
 			result = result[:start] + "${" + envVar + "}" + result[end+1:]
 			continue
 		}
 
+		// Profile-overridden properties → env var reference
+		if profileOverrides[propName] {
+			envVar := camelToUpperSnake(propName)
+			placeholder := "\x00ENVVAR:" + envVar + "\x00"
+			result = result[:start] + placeholder + result[end+1:]
+			continue
+		}
+
 		if resolved, ok := props[propName]; ok {
 			result = result[:start] + resolved + result[end+1:]
 		} else {
-			warnings = append(warnings, fmt.Sprintf("Maven property ${%s} could not be resolved — set manually", propName))
-			break
+			// Skip warning for likely shell variables (ALL_UPPER or single-word upper)
+			if !isLikelyShellVar(propName) {
+				warnings = append(warnings, fmt.Sprintf("Maven property ${%s} could not be resolved — set manually", propName))
+			}
+			// Replace with a placeholder to avoid re-processing, then restore after the loop
+			placeholder := "\x00UNRESOLVED:" + propName + "\x00"
+			result = result[:start] + placeholder + result[end+1:]
 		}
 	}
 
+	// Restore placeholders back to ${...} syntax
+	for strings.Contains(result, "\x00UNRESOLVED:") {
+		start := strings.Index(result, "\x00UNRESOLVED:")
+		end := strings.Index(result[start+1:], "\x00") + start + 1
+		propName := result[start+len("\x00UNRESOLVED:") : end]
+		result = result[:start] + "${" + propName + "}" + result[end+1:]
+	}
+	for strings.Contains(result, "\x00ENVVAR:") {
+		start := strings.Index(result, "\x00ENVVAR:")
+		end := strings.Index(result[start+1:], "\x00") + start + 1
+		envVar := result[start+len("\x00ENVVAR:") : end]
+		result = result[:start] + "${" + envVar + "}" + result[end+1:]
+	}
+
 	return result, warnings
+}
+
+// isLikelyShellVar returns true if the name looks like a shell variable
+// (all uppercase letters, digits, and underscores). These appear in command
+// strings and should not generate Maven property warnings.
+func isLikelyShellVar(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if !((r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+// camelToUpperSnake converts camelCase to UPPER_SNAKE_CASE.
+// e.g. "jmeterReplicas" → "JMETER_REPLICAS", "k6Hold" → "K6_HOLD"
+func camelToUpperSnake(s string) string {
+	var result []rune
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			// Don't insert underscore between consecutive uppercase (e.g. "k6" stays "K6")
+			prev := rune(s[i-1])
+			if prev >= 'a' && prev <= 'z' || prev >= '0' && prev <= '9' {
+				result = append(result, '_')
+			}
+		}
+		result = append(result, r)
+	}
+	return strings.ToUpper(string(result))
+}
+
+// convertDuration converts a resolved value to ISO 8601 duration.
+// If the value contains an env var reference, returns it as-is.
+func convertDuration(val string) string {
+	val = strings.TrimSpace(val)
+	if strings.Contains(val, "${") {
+		return val
+	}
+	return secondsToISO8601(parseIntOrZero(val))
 }
 
 func convertApiKey(key string) string {
@@ -515,9 +694,19 @@ func cleanCommand(cmd string) string {
 	var cleaned []string
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Strip trailing backslash — we re-add continuation on join
+		line = strings.TrimRight(line, " ")
+		line = strings.TrimSuffix(line, "\\")
+		line = strings.TrimRight(line, " ")
 		if line != "" {
 			cleaned = append(cleaned, line)
 		}
+	}
+	if len(cleaned) == 1 {
+		return cleaned[0]
 	}
 	return strings.Join(cleaned, " \\\n    ")
 }
