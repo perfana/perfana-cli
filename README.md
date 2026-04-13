@@ -6,12 +6,6 @@ Runs on macOS (arm/amd), Linux, and Windows with no external dependencies like J
 
 ## Installation
 
-### Homebrew (macOS/Linux)
-
-```bash
-brew install perfana/tap/perfana-cli
-```
-
 ### Docker
 
 ```bash
