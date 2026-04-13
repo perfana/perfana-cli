@@ -136,6 +136,39 @@ Use `perfana/perfana-cli` directly in your GitHub Actions workflows:
 | `version` | No | `latest` | Version of perfana-cli to install (e.g. `v0.1.0`) |
 | `args` | No | — | Additional arguments to pass to perfana-cli |
 
+### Using a config file
+
+Commit a `perfana.yaml` to your repository and reference it with the `config` input. Use environment variables for secrets so they stay out of version control:
+
+```yaml
+# perfana.yaml
+perfana:
+  apiKey: "${PERFANA_API_KEY}"
+  baseUrl: https://acme.perfana.cloud
+
+test:
+  systemUnderTest: my-service
+  environment: test
+  workload: loadTest
+  rampupTime: PT5M
+  constantLoadTime: PT15M
+  tags:
+    - ci
+```
+
+```yaml
+# .github/workflows/perfana.yml
+- uses: actions/checkout@v4
+- uses: perfana/perfana-cli@v0.1.0
+  env:
+    PERFANA_API_KEY: ${{ secrets.PERFANA_API_KEY }}
+  with:
+    command: run start
+    config: perfana.yaml
+```
+
+The CLI expands `${PERFANA_API_KEY}` in the YAML at runtime using the environment variable set by the workflow.
+
 ### Example: validate config on PRs, run tests on main
 
 ```yaml
