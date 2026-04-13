@@ -49,27 +49,6 @@ changelog:
       - "^ci:"
       - "^chore:"
 
-brews:
-  - repository:
-      owner: perfana
-      name: homebrew-tap
-    directory: Formula
-    homepage: "https://perfana.io"
-    description: "CLI tool for orchestrating performance tests with Perfana"
-    license: "Apache-2.0"
-    test: |
-      system "#{bin}/perfana-cli", "version"
-    install: |
-      bin.install "perfana-cli"
-
-scoops:
-  - repository:
-      owner: perfana
-      name: scoop-bucket
-    homepage: "https://perfana.io"
-    description: "CLI tool for orchestrating performance tests with Perfana"
-    license: "Apache-2.0"
-
 dockers:
   - image_templates:
       - "perfana/perfana-cli:{{ .Version }}-amd64"
