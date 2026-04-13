@@ -1,102 +1,159 @@
 # perfana-cli
 
-The command line interface to Perfana. 
+Command line interface for [Perfana](https://perfana.io) — orchestrate performance test runs, collect configs, and manage event lifecycles from the terminal.
 
-This is a beta release.
+Runs on macOS (arm/amd), Linux, and Windows with no external dependencies like Java or Maven.
 
-## Goal
+## Installation
 
-Use `perfana-cli` command to:
-* initialize config to connect to Perfana Cloud or Perfana local
-* start and stop a load test, send keep-alive until a defined end of run
+### Homebrew (macOS/Linux)
 
-Possible extensions:
-* send run config to Perfana
-* run scheduled commands
-* coordinate distributed load test
-* generate needed configurations (perfana-secure-gateway, otel-collector, load test script extensions)
-* check and troubleshoot configurations
-* act as simple psg for testing
+```bash
+brew install perfana/tap/perfana-cli
+```
 
-## Features
+### Docker
 
-* runs on many targets: MacOS (arm/amd), Linux, Windows
-* easy to download, configure and use
-* no need to install other tools like Java and Maven to use Perfana
+```bash
+docker run --rm perfana/perfana-cli version
+```
+
+### Binary download
+
+Download the latest release from [GitHub Releases](https://github.com/perfana/perfana-cli/releases).
+
+### Go install
+
+```bash
+go install github.com/perfana/perfana-cli@latest
+```
+
+## Quick start
+
+Initialize a configuration file at `~/.perfana-cli/perfana.yaml`:
+
+```bash
+perfana-cli init \
+  --baseUrl https://acme.perfana.cloud \
+  --clientIdentifier acme \
+  --apiKey "$PERFANA_API_KEY" \
+  --systemUnderTest my-service \
+  --environment test \
+  --workload loadTest
+```
+
+For mTLS (Perfana Cloud), add certificate paths:
+
+```bash
+perfana-cli init \
+  --baseUrl https://acme.perfana.cloud \
+  --clientIdentifier acme \
+  --clientKeyPath /path/to/tls.key \
+  --clientCertPath /path/to/tls.crt \
+  --apiKey "$PERFANA_API_KEY" \
+  --systemUnderTest my-service \
+  --environment test \
+  --workload loadTest
+```
+
+Start a test run:
+
+```bash
+perfana-cli run start \
+  --rampupTime=PT5M \
+  --constantLoadTime=PT15M \
+  --tags="k6,spring-boot" \
+  --version="2.0.1" \
+  --annotation="Nightly regression test"
+```
+
+The CLI orchestrates the full event lifecycle: BeforeTest → StartTest → KeepAlive → CheckResults → AfterTest. It keeps running until the configured duration completes or you stop it with `ctrl-C`.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `init` | Create `~/.perfana-cli/perfana.yaml` with connection and test defaults |
+| `init-project` | Generate an annotated `perfana.yaml` template in the current directory |
+| `validate` | Validate a `perfana.yaml` file (syntax, required fields, durations, event schemas) |
+| `run start` | Start a test run with full event lifecycle orchestration |
+| `migrate` | Convert a Maven pom.xml (event-scheduler-maven-plugin) to `perfana.yaml` |
+| `version` | Print version, commit hash, and build date |
+
+## Configuration
+
+Configuration is a YAML file (default: `~/.perfana-cli/perfana.yaml`, override with `--config`). Environment variables are expanded automatically.
+
+```yaml
+perfana:
+  apiKey: "${PERFANA_API_KEY}"
+  baseUrl: https://acme.perfana.cloud
+  clientIdentifier: acme
+  mtls:
+    enabled: true
+    clientCert: /path/to/tls.crt
+    clientKey: /path/to/tls.key
+
+test:
+  systemUnderTest: my-service
+  environment: test
+  workload: loadTest
+  version: "2.0.1"
+  rampupTime: PT5M
+  constantLoadTime: PT15M
+  tags:
+    - k6
+    - spring-boot
+  deepLinks:
+    - name: CI Build
+      url: https://ci.example.com/builds/123
+  variables:
+    - placeholder: service
+      value: my-service
+
+scheduler:
+  enabled: true
+  keepAliveIntervalSeconds: 30
+  failOnError: true
+
+events:
+  - name: collect-config
+    type: config-collector
+    command: kubectl get configmap my-config -o json
+    output: json
+    key: k8s-config
+
+  - name: restart-pods
+    type: command
+    commands:
+      onBeforeTest: kubectl rollout restart deployment/my-service
+      onAfterTest: echo "done"
+```
+
+Generate a fully annotated template with `perfana-cli init-project`.
+
+## Migrating from Maven
+
+If you have an existing `pom.xml` with `event-scheduler-maven-plugin` configuration:
+
+```bash
+perfana-cli migrate --input pom.xml --output perfana.yaml
+```
+
+This converts the Maven plugin config (event configs, property references, durations) to `perfana.yaml` format.
 
 ## Use cases
 
-* run next to load test and send Perfana events (start, stop, etc...)
-* scheduled to run for 20 minutes every day on production system to compare and find changes over time
-* simple way to test or try-out Perfana setup
-
-## How it works
-
-To access Perfana you need a key and for Perfana Cloud you need mTLS certificates. To initialize:
-
-    perfana-cli init
-
-If no `~/.perfana-cli` directory exists, it will be created with `perfana.yaml` file that contains
-placeholders for key and mTLS certificates. Also, defaults for `systemUnderTest`, `environment` and `workload`.
-These will be used in the commands with no explicit overrides on the command line.
-
-For Perfana Cloud, fill the `clientIdentifier` that is used in the `<clientIdentifier>.perfana.cloud` domain name, among others.
-
-To start a run of 30 minutes use:
-
-    perfana-cli run start \
-      --rampupTime=PT10m \
-      --constantLoadTime=PT20m \
-      --tags="k6,jfr" \
-      --annotation="Running custom test" \
-      --version="2.0.1" \ 
-      --buildResultsUrl="http://example.com/results"
-
-This will start a test run and send keep-alives for 30 minutes. It will keep running until the 
-run duration has passed or when you kill the command (e.g. using `ctrl-C`).
-
-During the run, metrics and other data sent to Perfana is actually received and stored. See the
-live data in the Perfana dashboards. After the run the automatic analysis in Perfana is started.
-
-To stop the run use `ctrl-c` or kill the process.
-
-# Example calls
-
-Init with data:
-
-    perfana-cli init \
-      --baseUrl http://acme.perfana.cloud \
-      --clientIdentifier acme \
-      --clientKeyPath /Users/alice/keys/tls.key \
-      --clientCertPath /Users/alice/keys/tls.crt \
-      --systemUnderTest cli-demo \
-      --environment local \
-      --workload loadTest \
-      --apiKey "$PERFANA_API_KEY"
-
-Send deep links or variables:
-
-    perfana-cli run start \
-      --rampupTime=PT1m \
-      --constantLoadTime=PT2m \
-      --tags="k6,jfr,spring-boot-kubernetes" \
-      --annotation="Short running custom test" \
-      --version="2.0.1" \
-      --buildResultsUrl="http://github.com/cli-demo/results/$GHA_BUILD_ID" \
-      --deeplink "Test Link|https://www.perfana.io" \
-      --deeplink "Test Link 2|https://my.loki.local/page/$PAGE_ID" \
-      --variable "service=tiny-bank-service" \
-      --variable "region=eu"
-
-# Todo
-
-* in the `~/.perfana-cli` directory the current run information is stored in `perfana-run.state`.
-* stop command
+- Run alongside a load test to send Perfana events (start, stop, keep-alive)
+- Schedule daily short runs on production to detect regressions over time
+- Quick way to try out a Perfana setup without Maven or Java
 
 ## What it is not
 
-This command line tool is not: 
-* a replacement for `x2i` that is used to send load data metrics to Perfana
-* a substitute for a production grade `perfana-secure-gateway`
-* a load generator
-* a stand alone tool
+- A replacement for `x2i` (used to send load data metrics to Perfana)
+- A substitute for a production-grade `perfana-secure-gateway`
+- A load generator
+
+## License
+
+Apache License 2.0
