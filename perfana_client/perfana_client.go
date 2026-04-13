@@ -32,6 +32,7 @@ type PerfanaMessage struct {
 	RampUp            string     `json:"rampUp,omitempty"`            // Optional (e.g., "PT5M" for a 5-minute ramp-up)
 	Duration          string     `json:"duration,omitempty"`          // Optional (e.g., "PT30M" for 30 minutes)
 	Completed         bool       `json:"completed"`
+	Abort             bool       `json:"abort,omitempty"`
 	Annotations       string     `json:"annotations,omitempty"` // Optional
 	Tags              []string   `json:"tags,omitempty"`        // Optional
 	Variables         []Variable `json:"variables,omitempty"`   // Optional
@@ -242,6 +243,47 @@ func (c *PerfanaClient) makeRequest(method, url string, body io.Reader) ([]byte,
 	}
 
 	return respBody, nil
+}
+
+// AbortTest sends an abort signal to the Perfana API for the given test run.
+func (c *PerfanaClient) AbortTest(testRunID string, additionalData map[string]interface{}) error {
+	url := fmt.Sprintf("%s/api/test", c.config.BaseUrl)
+
+	message := PerfanaMessage{
+		TestRunID:       testRunID,
+		Workload:        c.config.Workload,
+		TestEnvironment: c.config.Environment,
+		SystemUnderTest: c.config.SystemUnderTest,
+		Completed:       false,
+		Abort:           true,
+	}
+
+	if tags, ok := additionalData["tags"]; ok {
+		message.Tags = tags.([]string)
+	}
+	if version, ok := additionalData["version"]; ok {
+		message.Version = version.(string)
+	}
+
+	reqBody, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal abort request: %w", err)
+	}
+
+	_, err = c.makeRequest("POST", url, bytes.NewReader(reqBody))
+	return err
+}
+
+// GetTestRunStatus retrieves the status of a test run from the Perfana API.
+func (c *PerfanaClient) GetTestRunStatus(testRunID string) (string, error) {
+	url := fmt.Sprintf("%s/api/test-runs/%s", c.config.BaseUrl, testRunID)
+
+	resp, err := c.makeRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return string(resp), nil
 }
 
 // sendPerfanaEvent sends a PerfanaEvent to the /api/events endpoint.
