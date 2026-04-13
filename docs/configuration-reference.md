@@ -123,18 +123,29 @@ Events define actions that run at specific lifecycle points.
 |-------|----------|---------|-------------|
 | `name` | Yes | | Event handler name |
 | `type` | Yes | | Event type: `command` or `config-collector` |
-| `continueOnKeepAliveParticipant` | No | `false` | Keep running during keep-alive phase |
+| `continueOnKeepAliveParticipant` | No | `false` | Participate in keep-alive consensus (see below) |
+
+#### `continueOnKeepAliveParticipant` behavior
+
+When `true`, this event participates in consensus-based test stopping:
+
+- **`onStartTest`** runs **asynchronously** (non-blocking), so multiple load generators can start in parallel.
+- **`onKeepAlive`** is called every tick. When the command fails (non-zero exit), the participant signals "done".
+- **The test stops early** when **all** `continueOnKeepAliveParticipant` events have signaled done. If only some are done, the test keeps running.
+- **`onBeforeTest`** always runs **synchronously**, even for keep-alive participants. Use this for setup that must complete before the test starts (e.g. `kubectl rollout status`).
+
+This matches the Java event-scheduler's `StopTestRunException` consensus behavior.
 
 #### Type: `command`
 
-Runs shell commands at lifecycle hooks.
+Runs shell commands at lifecycle hooks. Commands support `__testRunId__`, `__systemUnderTest__`, `__environment__`, `__workload__`, and `__version__` placeholder substitution.
 
 | Field | Description |
 |-------|-------------|
-| `commands.onBeforeTest` | Runs before the test starts |
-| `commands.onStartTest` | Runs when the test starts |
-| `commands.onKeepAlive` | Runs on each keep-alive tick |
-| `commands.onAbort` | Runs if the test is aborted |
+| `commands.onBeforeTest` | Runs before the test starts (always synchronous) |
+| `commands.onStartTest` | Runs when the test starts (async when `continueOnKeepAliveParticipant: true`) |
+| `commands.onKeepAlive` | Runs on each keep-alive tick. Non-zero exit signals "done" for keep-alive participants |
+| `commands.onAbort` | Runs if the test is aborted (e.g. SIGINT) |
 | `commands.onAfterTest` | Runs after the test completes |
 
 #### Type: `config-collector`

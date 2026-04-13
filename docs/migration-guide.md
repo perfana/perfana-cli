@@ -44,77 +44,49 @@ perfana-cli init \
   --workload "baseline"
 ```
 
-### 3. Convert your Maven configuration
+### 3. Run the migrate command
 
-**Before (pom.xml):**
-```xml
-<plugin>
-  <groupId>io.perfana</groupId>
-  <artifactId>event-scheduler-maven-plugin</artifactId>
-  <configuration>
-    <eventSchedulerConfig>
-      <debugEnabled>true</debugEnabled>
-      <schedulerEnabled>true</schedulerEnabled>
-      <failOnError>true</failOnError>
-      <continueOnEventCheckFailure>false</continueOnEventCheckFailure>
-      <testConfig>
-        <systemUnderTest>MyApp</systemUnderTest>
-        <version>${app.version}</version>
-        <workload>peak-load</workload>
-        <testEnvironment>acceptance</testEnvironment>
-        <rampupTimeInSeconds>120</rampupTimeInSeconds>
-        <constantLoadTimeInSeconds>900</constantLoadTimeInSeconds>
-        <tags>
-          <tag>k6</tag>
-          <tag>nightly</tag>
-        </tags>
-      </testConfig>
-      <perfanaConfig>
-        <perfanaUrl>https://perfana.example.com</perfanaUrl>
-        <apiKey>${perfana.apiKey}</apiKey>
-      </perfanaConfig>
-      <eventConfigs>
-        <eventConfig>
-          <name>load-runner</name>
-          <eventFactory>io.perfana.events.commandrunner.CommandRunnerEventFactory</eventFactory>
-          <customEvents>
-            <onStartTest>k6 run /tests/load.js</onStartTest>
-            <onAfterTest>echo done</onAfterTest>
-          </customEvents>
-        </eventConfig>
-      </eventConfigs>
-    </eventSchedulerConfig>
-  </configuration>
-</plugin>
+The `migrate` command automatically converts your pom.xml:
+
+```bash
+perfana-cli migrate --input pom.xml --output perfana.yaml
 ```
 
-**After (perfana.yaml):**
-```yaml
-perfana:
-  apiKey: "${PERFANA_API_KEY}"
-  baseUrl: "https://perfana.example.com"
+This handles:
+- Any plugin containing `eventSchedulerConfig` (event-scheduler-maven-plugin, events-jmeter-maven-plugin, events-gatling-maven-plugin, etc.)
+- `CommandRunnerEventConfig` → `command` events
+- `TestRunConfigCommandEventConfig` → `config-collector` events
+- `PerfanaEventConfig` → skipped (handled natively by perfana-cli)
+- Maven `${env.VAR}` references → shell `${VAR}` syntax
+- Duration conversion (seconds → ISO 8601)
+- Maven property resolution with TODO warnings for unresolvable references
 
-test:
-  systemUnderTest: "MyApp"
-  environment: "acceptance"
-  workload: "peak-load"
-  version: "1.2.0"
-  rampupTime: "PT2M"
-  constantLoadTime: "PT15M"
-  tags:
-    - "k6"
-    - "nightly"
+#### Maven profiles → env files
 
-scheduler:
-  enabled: true
-  failOnError: true
+Properties overridden by Maven profiles are converted to `${ENV_VAR}` references in the YAML. The migrate command generates `.env` files for each profile:
 
-events:
-  - name: "load-runner"
-    type: command
-    commands:
-      onStartTest: "k6 run /tests/load.js"
-      onAfterTest: "echo done"
+```
+profiles/
+  test-type-load.env
+  test-type-stress.env
+  test-type-endurance.env
+```
+
+Usage:
+```bash
+source profiles/test-type-stress.env && perfana-cli run start
+```
+
+Example generated `.env` file:
+```bash
+# Profile: test-type-stress
+# Usage: source profiles/test-type-stress.env && perfana-cli run start
+
+WORKLOAD=stressTest
+JMETER_REPLICAS=1
+JMETER_THREADS=250
+RAMPUP_TIME_IN_SECONDS=PT2M
+CONSTANT_LOAD_TIME_IN_SECONDS=PT10M
 ```
 
 ### 4. Convert duration format
@@ -171,6 +143,8 @@ Once you've verified `perfana-cli` works, remove from your `pom.xml`:
 | mTLS | Java keystore | PEM files |
 | Scheduled events | Java event scheduler | Built-in Go scheduler |
 | Duration format | Seconds (integer) | ISO 8601 (`PT5M`) |
+| Profiles | Maven profiles (`-P`) | Env files (`source profiles/stress.env`) |
+| Migration | Manual | `perfana-cli migrate` (auto-generates YAML + profiles) |
 
 ## Troubleshooting
 
@@ -181,6 +155,20 @@ Replace Java event plugins with shell commands. Any action your Java plugin perf
 **Q: How do I pass Maven properties?**
 
 Use environment variables in your YAML: `${MY_VAR}`. Set them in your CI/CD pipeline.
+
+**Q: My load test data doesn't show up in Perfana?**
+
+The load generator must write metrics with the correct test run ID. Use the `__testRunId__` placeholder in your commands — perfana-cli substitutes it with the actual Perfana test run ID at runtime:
+
+```yaml
+events:
+  - name: jmeter-load
+    type: command
+    continueOnKeepAliveParticipant: true
+    commands:
+      onStartTest: "jmeter -n -t test.jmx -Jtest.testRunId=__testRunId__"
+      onKeepAlive: "pgrep -f jmeter || exit 1"
+```
 
 **Q: Where is the config file?**
 

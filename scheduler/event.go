@@ -41,6 +41,11 @@ type Event interface {
 
 	// AbortTest is called when the test is aborted (e.g., SIGINT/SIGTERM).
 	AbortTest(ctx TestContext) error
+
+	// IsContinueOnKeepAliveParticipant returns true if this event participates
+	// in the keep-alive consensus: the test stops early when ALL participants
+	// with this flag have signaled done.
+	IsContinueOnKeepAliveParticipant() bool
 }
 
 // ScheduleEntry represents a parsed schedule script line.

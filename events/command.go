@@ -43,13 +43,18 @@ func NewCommandEvent(cfg CommandEventConfig) *CommandEvent {
 	}
 }
 
-func (e *CommandEvent) Name() string { return e.name }
+func (e *CommandEvent) Name() string                        { return e.name }
+func (e *CommandEvent) IsContinueOnKeepAliveParticipant() bool { return e.continueOnKeepAliveParticipant }
 
 func (e *CommandEvent) BeforeTest(ctx scheduler.TestContext) error {
 	return e.runCommand(ctx, e.commands.OnBeforeTest, "BeforeTest")
 }
 
 func (e *CommandEvent) StartTest(ctx scheduler.TestContext) error {
+	if e.continueOnKeepAliveParticipant && e.commands.OnStartTest != "" {
+		// Run async — the keep-alive check monitors whether it's still running
+		return e.runCommandAsync(ctx, e.commands.OnStartTest, "StartTest")
+	}
 	return e.runCommand(ctx, e.commands.OnStartTest, "StartTest")
 }
 
@@ -93,6 +98,36 @@ func (e *CommandEvent) AfterTest(ctx scheduler.TestContext) error {
 
 func (e *CommandEvent) AbortTest(ctx scheduler.TestContext) error {
 	return e.runCommand(ctx, e.commands.OnAbort, "AbortTest")
+}
+
+// runCommandAsync launches a shell command in the background and returns immediately.
+func (e *CommandEvent) runCommandAsync(ctx scheduler.TestContext, command, phase string) error {
+	if command == "" {
+		return nil
+	}
+
+	expanded := substituteVariables(command, ctx)
+	log.Printf("[%s] %s (async): %s", e.name, phase, expanded)
+
+	cmd := exec.Command("sh", "-c", expanded)
+	cmd.Stdout = log.Writer()
+	cmd.Stderr = log.Writer()
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("command failed to start: %w", err)
+	}
+
+	// Monitor in background — log when it exits
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			log.Printf("[%s] %s (async) exited with error: %v", e.name, phase, err)
+		} else {
+			log.Printf("[%s] %s (async) completed", e.name, phase)
+		}
+	}()
+
+	return nil
 }
 
 // runCommand executes a shell command with variable substitution.

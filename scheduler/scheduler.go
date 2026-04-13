@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"sort"
-	"sync"
 	"syscall"
 	"time"
 
@@ -115,6 +114,9 @@ func (s *EventScheduler) runLifecyclePhase(phase string, fn func(Event) error) e
 
 // runKeepAliveLoop runs the keep-alive ticker, fires scheduled events at their times,
 // and listens for SIGINT/SIGTERM. Returns true if aborted by signal.
+//
+// The loop stops early when ALL events with continueOnKeepAliveParticipant=true
+// have signaled done (consensus-based stop, matching the Java event-scheduler behavior).
 func (s *EventScheduler) runKeepAliveLoop() bool {
 	keepAliveInterval := time.Duration(s.KeepAliveIntervalSec) * time.Second
 	if keepAliveInterval <= 0 {
@@ -139,8 +141,18 @@ func (s *EventScheduler) runKeepAliveLoop() bool {
 		}
 	}()
 
-	// Track keep-alive participants
-	var mu sync.Mutex
+	// Count keep-alive participants for consensus-based stop
+	keepAliveParticipantCount := 0
+	for _, event := range s.Events {
+		if event.IsContinueOnKeepAliveParticipant() {
+			keepAliveParticipantCount++
+		}
+	}
+	if keepAliveParticipantCount > 0 {
+		log.Printf("Keep-alive participants: %d (test stops when all signal done)", keepAliveParticipantCount)
+	}
+
+	// Track which keep-alive participants have signaled done
 	keepAliveParticipantsDone := make(map[string]bool)
 
 	for {
@@ -162,11 +174,20 @@ func (s *EventScheduler) runKeepAliveLoop() bool {
 			// Call KeepAlive on all events
 			for _, event := range s.Events {
 				if err := event.KeepAlive(s.TestContext); err != nil {
-					mu.Lock()
-					keepAliveParticipantsDone[event.Name()] = true
-					mu.Unlock()
-					log.Printf("[KeepAlive] %s signaled done: %v", event.Name(), err)
+					if event.IsContinueOnKeepAliveParticipant() && !keepAliveParticipantsDone[event.Name()] {
+						keepAliveParticipantsDone[event.Name()] = true
+						log.Printf("[KeepAlive] %s signaled done (%d/%d): %v",
+							event.Name(), len(keepAliveParticipantsDone), keepAliveParticipantCount, err)
+					} else if !keepAliveParticipantsDone[event.Name()] {
+						log.Printf("[KeepAlive] %s error: %v", event.Name(), err)
+					}
 				}
+			}
+
+			// Check if all keep-alive participants are done → stop test early
+			if keepAliveParticipantCount > 0 && len(keepAliveParticipantsDone) >= keepAliveParticipantCount {
+				log.Printf("All %d keep-alive participants done, stopping test.", keepAliveParticipantCount)
+				return false
 			}
 		}
 	}

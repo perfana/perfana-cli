@@ -51,7 +51,8 @@ func NewConfigCollectorEvent(cfg ConfigCollectorConfig) *ConfigCollectorEvent {
 	}
 }
 
-func (e *ConfigCollectorEvent) Name() string { return e.name }
+func (e *ConfigCollectorEvent) Name() string                        { return e.name }
+func (e *ConfigCollectorEvent) IsContinueOnKeepAliveParticipant() bool { return false }
 
 // BeforeTest runs the config collection command and uploads to Perfana.
 func (e *ConfigCollectorEvent) BeforeTest(ctx scheduler.TestContext) error {

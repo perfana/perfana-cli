@@ -70,9 +70,9 @@ Durations use ISO 8601 format:
 ### Lifecycle
 
 1. **Init** - registers the test session with Perfana
-2. **BeforeTest** - runs scheduled pre-test events
-3. **StartTest** - begins the test, fires start events
-4. **KeepAlive** - heartbeats every 30 seconds for the test duration
+2. **BeforeTest** - runs pre-test events synchronously (e.g. deploy infrastructure, wait for readiness)
+3. **StartTest** - begins the test. Events with `continueOnKeepAliveParticipant: true` run asynchronously; others run sequentially
+4. **KeepAlive** - heartbeats every 30 seconds. When all keep-alive participants signal done, the test stops early
 5. **CheckResults** - queries Perfana for analysis results
 6. **AfterTest** - runs post-test cleanup events
 
