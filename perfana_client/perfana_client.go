@@ -288,17 +288,21 @@ func (c *PerfanaClient) GetTestRunStatus(testRunID string) (string, error) {
 
 // ConfigKeyRequest represents a single key-value config upload.
 type ConfigKeyRequest struct {
-	TestRunID string `json:"testRunId"`
-	Key       string `json:"key"`
-	Value     string `json:"value"`
-	Tags      []string `json:"tags,omitempty"`
+	TestRunID       string   `json:"testRunId"`
+	Application     string   `json:"application"`
+	TestEnvironment string   `json:"testEnvironment"`
+	Key             string   `json:"key"`
+	Value           string   `json:"value"`
+	Tags            []string `json:"tags,omitempty"`
 }
 
 // ConfigKeysRequest represents a multi key-value config upload.
 type ConfigKeysRequest struct {
-	TestRunID   string       `json:"testRunId"`
-	ConfigItems []ConfigItem `json:"configItems"`
-	Tags        []string     `json:"tags,omitempty"`
+	TestRunID       string       `json:"testRunId"`
+	Application     string       `json:"application"`
+	TestEnvironment string       `json:"testEnvironment"`
+	ConfigItems     []ConfigItem `json:"configItems"`
+	Tags            []string     `json:"tags,omitempty"`
 }
 
 // ConfigItem is a single key-value pair for config upload.
@@ -309,22 +313,26 @@ type ConfigItem struct {
 
 // ConfigJSONRequest represents a JSON config upload with regex filters.
 type ConfigJSONRequest struct {
-	TestRunID string      `json:"testRunId"`
-	JSON      interface{} `json:"json"`
-	Includes  []string    `json:"includes,omitempty"`
-	Excludes  []string    `json:"excludes,omitempty"`
-	Tags      []string    `json:"tags,omitempty"`
+	TestRunID       string      `json:"testRunId"`
+	Application     string      `json:"application"`
+	TestEnvironment string      `json:"testEnvironment"`
+	JSON            interface{} `json:"json"`
+	Includes        []string    `json:"includes,omitempty"`
+	Excludes        []string    `json:"excludes,omitempty"`
+	Tags            []string    `json:"tags,omitempty"`
 }
 
 // SendConfigKey uploads a single key-value config to Perfana.
-func (c *PerfanaClient) SendConfigKey(testRunID, key, value string, tags []string) error {
+func (c *PerfanaClient) SendConfigKey(testRunID, application, testEnvironment, key, value string, tags []string) error {
 	url := fmt.Sprintf("%s/api/config/key", c.config.BaseUrl)
 
 	reqBody, err := json.Marshal(ConfigKeyRequest{
-		TestRunID: testRunID,
-		Key:       key,
-		Value:     value,
-		Tags:      tags,
+		TestRunID:       testRunID,
+		Application:     application,
+		TestEnvironment: testEnvironment,
+		Key:             key,
+		Value:           value,
+		Tags:            tags,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal config key request: %w", err)
@@ -335,13 +343,15 @@ func (c *PerfanaClient) SendConfigKey(testRunID, key, value string, tags []strin
 }
 
 // SendConfigKeys uploads multiple key-value configs to Perfana.
-func (c *PerfanaClient) SendConfigKeys(testRunID string, items []ConfigItem, tags []string) error {
+func (c *PerfanaClient) SendConfigKeys(testRunID, application, testEnvironment string, items []ConfigItem, tags []string) error {
 	url := fmt.Sprintf("%s/api/config/keys", c.config.BaseUrl)
 
 	reqBody, err := json.Marshal(ConfigKeysRequest{
-		TestRunID:   testRunID,
-		ConfigItems: items,
-		Tags:        tags,
+		TestRunID:       testRunID,
+		Application:     application,
+		TestEnvironment: testEnvironment,
+		ConfigItems:     items,
+		Tags:            tags,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal config keys request: %w", err)
@@ -352,15 +362,17 @@ func (c *PerfanaClient) SendConfigKeys(testRunID string, items []ConfigItem, tag
 }
 
 // SendConfigJSON uploads JSON config with regex filters to Perfana.
-func (c *PerfanaClient) SendConfigJSON(testRunID string, jsonData interface{}, includes, excludes, tags []string) error {
+func (c *PerfanaClient) SendConfigJSON(testRunID, application, testEnvironment string, jsonData interface{}, includes, excludes, tags []string) error {
 	url := fmt.Sprintf("%s/api/config/json", c.config.BaseUrl)
 
 	reqBody, err := json.Marshal(ConfigJSONRequest{
-		TestRunID: testRunID,
-		JSON:      jsonData,
-		Includes:  includes,
-		Excludes:  excludes,
-		Tags:      tags,
+		TestRunID:       testRunID,
+		Application:     application,
+		TestEnvironment: testEnvironment,
+		JSON:            jsonData,
+		Includes:        includes,
+		Excludes:        excludes,
+		Tags:            tags,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal config json request: %w", err)

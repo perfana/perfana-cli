@@ -92,10 +92,13 @@ func (e *ConfigCollectorEvent) uploadConfig(ctx scheduler.TestContext, stdout st
 	client := ctx.Client
 	testRunID := ctx.TestRunID
 
+	application := ctx.SystemUnderTest
+	environment := ctx.Environment
+
 	switch e.output {
 	case "key":
 		log.Printf("[%s] Uploading single key: %s", e.name, e.key)
-		return client.SendConfigKey(testRunID, e.key, stdout, e.tags)
+		return client.SendConfigKey(testRunID, application, environment, e.key, stdout, e.tags)
 
 	case "keys":
 		items := parseKeyValueLines(stdout)
@@ -104,7 +107,7 @@ func (e *ConfigCollectorEvent) uploadConfig(ctx scheduler.TestContext, stdout st
 			return nil
 		}
 		log.Printf("[%s] Uploading %d config keys", e.name, len(items))
-		return client.SendConfigKeys(testRunID, items, e.tags)
+		return client.SendConfigKeys(testRunID, application, environment, items, e.tags)
 
 	case "json":
 		var jsonData interface{}
@@ -112,7 +115,7 @@ func (e *ConfigCollectorEvent) uploadConfig(ctx scheduler.TestContext, stdout st
 			return fmt.Errorf("config output is not valid JSON: %w", err)
 		}
 		log.Printf("[%s] Uploading JSON config", e.name)
-		return client.SendConfigJSON(testRunID, jsonData, e.includes, e.excludes, e.tags)
+		return client.SendConfigJSON(testRunID, application, environment, jsonData, e.includes, e.excludes, e.tags)
 
 	default:
 		return fmt.Errorf("unsupported output mode: %s (expected key, keys, or json)", e.output)
