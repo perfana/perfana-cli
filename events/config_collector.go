@@ -51,7 +51,7 @@ func NewConfigCollectorEvent(cfg ConfigCollectorConfig) *ConfigCollectorEvent {
 	}
 }
 
-func (e *ConfigCollectorEvent) Name() string                        { return e.name }
+func (e *ConfigCollectorEvent) Name() string                           { return e.name }
 func (e *ConfigCollectorEvent) IsContinueOnKeepAliveParticipant() bool { return false }
 
 // BeforeTest runs the config collection command and uploads to Perfana.
@@ -78,11 +78,11 @@ func (e *ConfigCollectorEvent) BeforeTest(ctx scheduler.TestContext) error {
 	return e.uploadConfig(ctx, stdout)
 }
 
-func (e *ConfigCollectorEvent) StartTest(ctx scheduler.TestContext) error  { return nil }
-func (e *ConfigCollectorEvent) KeepAlive(ctx scheduler.TestContext) error  { return nil }
+func (e *ConfigCollectorEvent) StartTest(ctx scheduler.TestContext) error    { return nil }
+func (e *ConfigCollectorEvent) KeepAlive(ctx scheduler.TestContext) error    { return nil }
 func (e *ConfigCollectorEvent) CheckResults(ctx scheduler.TestContext) error { return nil }
-func (e *ConfigCollectorEvent) AfterTest(ctx scheduler.TestContext) error  { return nil }
-func (e *ConfigCollectorEvent) AbortTest(ctx scheduler.TestContext) error  { return nil }
+func (e *ConfigCollectorEvent) AfterTest(ctx scheduler.TestContext) error    { return nil }
+func (e *ConfigCollectorEvent) AbortTest(ctx scheduler.TestContext) error    { return nil }
 
 func (e *ConfigCollectorEvent) OnEvent(ctx scheduler.TestContext, settings map[string]string) error {
 	return nil

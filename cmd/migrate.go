@@ -49,9 +49,9 @@ type MavenPlugins struct {
 }
 
 type MavenPlugin struct {
-	GroupID       string              `xml:"groupId"`
-	ArtifactID    string              `xml:"artifactId"`
-	Configuration MavenConfiguration  `xml:"configuration"`
+	GroupID       string             `xml:"groupId"`
+	ArtifactID    string             `xml:"artifactId"`
+	Configuration MavenConfiguration `xml:"configuration"`
 }
 
 type MavenConfiguration struct {
@@ -59,27 +59,27 @@ type MavenConfiguration struct {
 }
 
 type MavenEventSchedulerConfig struct {
-	DebugEnabled              string             `xml:"debugEnabled"`
-	SchedulerEnabled          string             `xml:"schedulerEnabled"`
-	FailOnError               string             `xml:"failOnError"`
-	KeepAliveIntervalSeconds  string             `xml:"keepAliveIntervalSeconds"`
-	TestConfig                MavenTestConfig    `xml:"testConfig"`
-	PerfanaConfig             MavenPerfanaConfig `xml:"perfanaConfig"`
-	ScheduleScript            string             `xml:"scheduleScript"`
-	EventConfigs              MavenEventConfigs  `xml:"eventConfigs"`
+	DebugEnabled             string             `xml:"debugEnabled"`
+	SchedulerEnabled         string             `xml:"schedulerEnabled"`
+	FailOnError              string             `xml:"failOnError"`
+	KeepAliveIntervalSeconds string             `xml:"keepAliveIntervalSeconds"`
+	TestConfig               MavenTestConfig    `xml:"testConfig"`
+	PerfanaConfig            MavenPerfanaConfig `xml:"perfanaConfig"`
+	ScheduleScript           string             `xml:"scheduleScript"`
+	EventConfigs             MavenEventConfigs  `xml:"eventConfigs"`
 }
 
 type MavenTestConfig struct {
-	SystemUnderTest          string `xml:"systemUnderTest"`
-	Version                  string `xml:"version"`
-	Workload                 string `xml:"workload"`
-	TestEnvironment          string `xml:"testEnvironment"`
-	TestRunID                string `xml:"testRunId"`
-	BuildResultsUrl          string `xml:"buildResultsUrl"`
-	RampupTimeInSeconds      string `xml:"rampupTimeInSeconds"`
+	SystemUnderTest           string `xml:"systemUnderTest"`
+	Version                   string `xml:"version"`
+	Workload                  string `xml:"workload"`
+	TestEnvironment           string `xml:"testEnvironment"`
+	TestRunID                 string `xml:"testRunId"`
+	BuildResultsUrl           string `xml:"buildResultsUrl"`
+	RampupTimeInSeconds       string `xml:"rampupTimeInSeconds"`
 	ConstantLoadTimeInSeconds string `xml:"constantLoadTimeInSeconds"`
-	Annotations              string `xml:"annotations"`
-	Tags                     string `xml:"tags"`
+	Annotations               string `xml:"annotations"`
+	Tags                      string `xml:"tags"`
 }
 
 type MavenPerfanaConfig struct {
@@ -115,7 +115,7 @@ type MavenEventConfig struct {
 	ApiKey               string `xml:"apiKey"`
 	AssertResultsEnabled string `xml:"assertResultsEnabled"`
 	// SpringBoot fields
-	ActuatorBaseUrl      string `xml:"actuatorBaseUrl"`
+	ActuatorBaseUrl       string `xml:"actuatorBaseUrl"`
 	ActuatorEnvProperties string `xml:"actuatorEnvProperties"`
 	// WireMock fields
 	WiremockUrl string `xml:"wiremockUrl"`
@@ -434,8 +434,8 @@ func migratePom(pomPath string) (*MigratedConfig, []string, map[string]string, e
 		switch {
 		case strings.Contains(impl, "CommandRunnerEventConfig"):
 			event := MigratedEvent{
-				Name: name,
-				Type: "command",
+				Name:                           name,
+				Type:                           "command",
 				ContinueOnKeepAliveParticipant: resolveBool(ec.ContinueOnKeepAliveParticipant, false),
 				Commands: &MigratedCommands{
 					OnBeforeTest: cleanCommand(resolve(ec.OnBeforeTest)),
@@ -492,11 +492,11 @@ func migratePom(pomPath string) (*MigratedConfig, []string, map[string]string, e
 		"constantLoadTimeInSeconds":     true,
 		"durationInSeconds":             true,
 		"excludeRampUpTimeFromAnalysis": true,
-		"jmeterRampup":                 true,
-		"jmeterHold":                   true,
-		"k6Rampup":                     true,
-		"k6Hold":                       true,
-		"k6Rampdown":                   true,
+		"jmeterRampup":                  true,
+		"jmeterHold":                    true,
+		"k6Rampup":                      true,
+		"k6Hold":                        true,
+		"k6Rampdown":                    true,
 	}
 
 	// Generate profile .env files

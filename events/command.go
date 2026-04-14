@@ -11,10 +11,10 @@ import (
 
 // CommandEventConfig holds the YAML configuration for a command event.
 type CommandEventConfig struct {
-	Name                           string            `yaml:"name"`
-	Type                           string            `yaml:"type"`
-	ContinueOnKeepAliveParticipant bool              `yaml:"continueOnKeepAliveParticipant"`
-	Commands                       CommandHooks      `yaml:"commands"`
+	Name                           string       `yaml:"name"`
+	Type                           string       `yaml:"type"`
+	ContinueOnKeepAliveParticipant bool         `yaml:"continueOnKeepAliveParticipant"`
+	Commands                       CommandHooks `yaml:"commands"`
 }
 
 // CommandHooks maps lifecycle hooks to shell commands.
@@ -43,8 +43,10 @@ func NewCommandEvent(cfg CommandEventConfig) *CommandEvent {
 	}
 }
 
-func (e *CommandEvent) Name() string                        { return e.name }
-func (e *CommandEvent) IsContinueOnKeepAliveParticipant() bool { return e.continueOnKeepAliveParticipant }
+func (e *CommandEvent) Name() string { return e.name }
+func (e *CommandEvent) IsContinueOnKeepAliveParticipant() bool {
+	return e.continueOnKeepAliveParticipant
+}
 
 func (e *CommandEvent) BeforeTest(ctx scheduler.TestContext) error {
 	return e.runCommand(ctx, e.commands.OnBeforeTest, "BeforeTest")

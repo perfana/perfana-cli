@@ -247,4 +247,3 @@ events:
 		fmt.Printf("Created %s with annotated template\n", outputPath)
 	},
 }
-

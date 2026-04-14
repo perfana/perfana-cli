@@ -24,20 +24,20 @@ type PerfanaEvent struct {
 
 // PerfanaMessage represents the JSON payload sent to start a session
 type PerfanaMessage struct {
-	TestRunID         string     `json:"testRunId"`
-	Workload          string     `json:"workload"`
-	TestEnvironment   string     `json:"testEnvironment"`
-	SystemUnderTest   string     `json:"systemUnderTest"`
-	Version           string     `json:"version,omitempty"`           // Optional
-	CIBuildResultsURL string     `json:"CIBuildResultsUrl,omitempty"` // Optional
-	AnalysisStartOffset string   `json:"analysisStartOffset,omitempty"` // Optional (e.g., "PT5M" for a 5-minute ramp-up)
-	Duration          string     `json:"duration,omitempty"`          // Optional (e.g., "PT30M" for 30 minutes)
-	Completed         bool       `json:"completed"`
-	Abort             bool       `json:"abort,omitempty"`
-	Annotations       string     `json:"annotations,omitempty"` // Optional
-	Tags              []string   `json:"tags,omitempty"`        // Optional
-	Variables         []Variable `json:"variables,omitempty"`   // Optional
-	DeepLinks         []DeepLink `json:"deepLinks,omitempty"`   // Optional
+	TestRunID           string     `json:"testRunId"`
+	Workload            string     `json:"workload"`
+	TestEnvironment     string     `json:"testEnvironment"`
+	SystemUnderTest     string     `json:"systemUnderTest"`
+	Version             string     `json:"version,omitempty"`             // Optional
+	CIBuildResultsURL   string     `json:"CIBuildResultsUrl,omitempty"`   // Optional
+	AnalysisStartOffset string     `json:"analysisStartOffset,omitempty"` // Optional (e.g., "PT5M" for a 5-minute ramp-up)
+	Duration            string     `json:"duration,omitempty"`            // Optional (e.g., "PT30M" for 30 minutes)
+	Completed           bool       `json:"completed"`
+	Abort               bool       `json:"abort,omitempty"`
+	Annotations         string     `json:"annotations,omitempty"` // Optional
+	Tags                []string   `json:"tags,omitempty"`        // Optional
+	Variables           []Variable `json:"variables,omitempty"`   // Optional
+	DeepLinks           []DeepLink `json:"deepLinks,omitempty"`   // Optional
 }
 
 // Variable is used in PerfanaMessage to send key-value pairs

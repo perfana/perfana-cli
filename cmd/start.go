@@ -40,16 +40,16 @@ type FullConfig struct {
 
 // TestConfig holds test-level settings from YAML.
 type TestConfig struct {
-	SystemUnderTest  string             `yaml:"systemUnderTest"`
-	Environment      string             `yaml:"environment"`
-	Workload         string             `yaml:"workload"`
-	Version          string             `yaml:"version"`
-	RampupTime       string             `yaml:"rampupTime"`
-	ConstantLoadTime string             `yaml:"constantLoadTime"`
-	Tags             []string           `yaml:"tags"`
-	Annotations      string             `yaml:"annotations"`
+	SystemUnderTest  string                    `yaml:"systemUnderTest"`
+	Environment      string                    `yaml:"environment"`
+	Workload         string                    `yaml:"workload"`
+	Version          string                    `yaml:"version"`
+	RampupTime       string                    `yaml:"rampupTime"`
+	ConstantLoadTime string                    `yaml:"constantLoadTime"`
+	Tags             []string                  `yaml:"tags"`
+	Annotations      string                    `yaml:"annotations"`
 	DeepLinks        []perfana_client.DeepLink `yaml:"deepLinks"`
-	Variables        []VariableConfig   `yaml:"variables"`
+	Variables        []VariableConfig          `yaml:"variables"`
 }
 
 // VariableConfig holds a placeholder/value pair from YAML.
@@ -68,10 +68,10 @@ type SchedulerConfig struct {
 
 // EventConfig is a generic event entry from YAML that supports both types.
 type EventConfig struct {
-	Name                           string                `yaml:"name"`
-	Type                           string                `yaml:"type"`
-	ContinueOnKeepAliveParticipant bool                  `yaml:"continueOnKeepAliveParticipant"`
-	Commands                       events.CommandHooks   `yaml:"commands"`
+	Name                           string              `yaml:"name"`
+	Type                           string              `yaml:"type"`
+	ContinueOnKeepAliveParticipant bool                `yaml:"continueOnKeepAliveParticipant"`
+	Commands                       events.CommandHooks `yaml:"commands"`
 	// Config collector fields
 	Command  string   `yaml:"command"`
 	Output   string   `yaml:"output"`
@@ -227,18 +227,18 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 
 		// Build test context
 		testCtx := scheduler.TestContext{
-			SystemUnderTest: config.SystemUnderTest,
-			Environment:     config.Environment,
-			Workload:        config.Workload,
-			Version:         effectiveVersion,
-			Tags:            tagList,
-			Variables:       variables,
-			Annotations:     effectiveAnnotation,
+			SystemUnderTest:     config.SystemUnderTest,
+			Environment:         config.Environment,
+			Workload:            config.Workload,
+			Version:             effectiveVersion,
+			Tags:                tagList,
+			Variables:           variables,
+			Annotations:         effectiveAnnotation,
 			AnalysisStartOffset: effectiveRampup,
-			Duration:        effectiveConstant,
-			BuildResultsUrl: effectiveBuildResultsUrl,
-			DeepLinks:       fullConfig.Test.DeepLinks,
-			Client:          client,
+			Duration:            effectiveConstant,
+			BuildResultsUrl:     effectiveBuildResultsUrl,
+			DeepLinks:           fullConfig.Test.DeepLinks,
+			Client:              client,
 		}
 
 		// Parse events from YAML config

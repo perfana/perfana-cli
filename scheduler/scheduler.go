@@ -15,13 +15,13 @@ import (
 // EventScheduler orchestrates the full test lifecycle:
 // BeforeTest → StartTest → KeepAlive loop (+ scheduled events) → CheckResults → AfterTest
 type EventScheduler struct {
-	Client                *perfana_client.PerfanaClient
-	Events                []Event
-	ScheduleEntries       []ScheduleEntry
-	KeepAliveIntervalSec  int
-	TestDurationSec       int
-	TestContext           TestContext
-	FailOnError           bool
+	Client               *perfana_client.PerfanaClient
+	Events               []Event
+	ScheduleEntries      []ScheduleEntry
+	KeepAliveIntervalSec int
+	TestDurationSec      int
+	TestContext          TestContext
+	FailOnError          bool
 
 	testRunID string
 }
