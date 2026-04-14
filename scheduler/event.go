@@ -11,6 +11,11 @@ type TestContext struct {
 	Version         string
 	Tags            []string
 	Variables       map[string]string
+	Annotations     string
+	RampUp          string
+	Duration        string
+	BuildResultsUrl string
+	DeepLinks       []perfana_client.DeepLink
 	Client          *perfana_client.PerfanaClient
 }
 

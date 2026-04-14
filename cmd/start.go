@@ -216,6 +216,15 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			}
 		}
 
+		// Resolve annotation from CLI flag or YAML
+		effectiveAnnotation := fullConfig.Test.Annotations
+		if annotation != "" {
+			effectiveAnnotation = annotation
+		}
+
+		// Resolve buildResultsUrl from CLI flag or YAML
+		effectiveBuildResultsUrl := buildResultsUrl
+
 		// Build test context
 		testCtx := scheduler.TestContext{
 			SystemUnderTest: config.SystemUnderTest,
@@ -224,6 +233,11 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			Version:         effectiveVersion,
 			Tags:            tagList,
 			Variables:       variables,
+			Annotations:     effectiveAnnotation,
+			RampUp:          effectiveRampup,
+			Duration:        effectiveConstant,
+			BuildResultsUrl: effectiveBuildResultsUrl,
+			DeepLinks:       fullConfig.Test.DeepLinks,
 			Client:          client,
 		}
 
