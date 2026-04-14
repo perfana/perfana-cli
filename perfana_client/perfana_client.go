@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"perfana-cli/util"
 	"time"
 )
 
@@ -30,8 +31,8 @@ type PerfanaMessage struct {
 	SystemUnderTest     string     `json:"systemUnderTest"`
 	Version             string     `json:"version,omitempty"`             // Optional
 	CIBuildResultsURL   string     `json:"CIBuildResultsUrl,omitempty"`   // Optional
-	AnalysisStartOffset string     `json:"analysisStartOffset,omitempty"` // Optional (e.g., "PT5M" for a 5-minute ramp-up)
-	Duration            string     `json:"duration,omitempty"`            // Optional (e.g., "PT30M" for 30 minutes)
+	AnalysisStartOffset int        `json:"analysisStartOffset,omitempty"` // Optional, seconds
+	Duration            int        `json:"duration,omitempty"`            // Optional, seconds
 	Completed           bool       `json:"completed"`
 	Abort               bool       `json:"abort,omitempty"`
 	Annotations         string     `json:"annotations,omitempty"` // Optional
@@ -171,10 +172,18 @@ func (c *PerfanaClient) TestEvent(testRunID string, additionalData map[string]in
 		message.CIBuildResultsURL = cibuildResultsUrl.(string)
 	}
 	if analysisStartOffset, ok := additionalData["analysisStartOffset"]; ok {
-		message.AnalysisStartOffset = analysisStartOffset.(string)
+		seconds, err := normalizeDurationToSeconds(analysisStartOffset)
+		if err != nil {
+			return fmt.Errorf("invalid analysisStartOffset: %w", err)
+		}
+		message.AnalysisStartOffset = seconds
 	}
 	if duration, ok := additionalData["duration"]; ok {
-		message.Duration = duration.(string)
+		seconds, err := normalizeDurationToSeconds(duration)
+		if err != nil {
+			return fmt.Errorf("invalid duration: %w", err)
+		}
+		message.Duration = seconds
 	}
 	if annotations, ok := additionalData["annotations"]; ok {
 		message.Annotations = annotations.(string)
@@ -208,6 +217,37 @@ func (c *PerfanaClient) TestEvent(testRunID string, additionalData map[string]in
 	fmt.Printf("TestEvent response: %s\n", string(resp))
 
 	return nil
+}
+
+func normalizeDurationToSeconds(raw interface{}) (int, error) {
+	switch v := raw.(type) {
+	case int:
+		if v < 0 {
+			return 0, fmt.Errorf("must be non-negative")
+		}
+		return v, nil
+	case int64:
+		if v < 0 {
+			return 0, fmt.Errorf("must be non-negative")
+		}
+		return int(v), nil
+	case float64:
+		if v < 0 {
+			return 0, fmt.Errorf("must be non-negative")
+		}
+		if v != float64(int(v)) {
+			return 0, fmt.Errorf("must be an integer number of seconds")
+		}
+		return int(v), nil
+	case string:
+		seconds, err := util.ParseISODurationToSeconds(v)
+		if err != nil {
+			return 0, err
+		}
+		return seconds, nil
+	default:
+		return 0, fmt.Errorf("unsupported type %T", raw)
+	}
 }
 
 // Shared helper method for HTTP requests
