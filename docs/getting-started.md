@@ -77,7 +77,7 @@ Start a test session with a 5-minute rampup and 15-minute constant load:
 
 ```bash
 perfana-cli run start \
-  --rampupTime=PT5M \
+  --analysisStartOffset=PT5M \
   --constantLoadTime=PT15M \
   --version="1.2.0" \
   --tags="k6,nightly" \
@@ -98,7 +98,7 @@ Enrich your test session with deep links and variables:
 
 ```bash
 perfana-cli run start \
-  --rampupTime=PT2M \
+  --analysisStartOffset=PT2M \
   --constantLoadTime=PT10M \
   --version="1.2.0" \
   --tags="k6,spring-boot" \

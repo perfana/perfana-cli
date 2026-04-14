@@ -111,7 +111,7 @@ mvn event-scheduler:test -Dperfana.apiKey=$API_KEY
 **After (perfana-cli in CI):**
 ```bash
 perfana-cli run start \
-  --rampupTime=PT2M \
+  --analysisStartOffset=PT2M \
   --constantLoadTime=PT15M
 ```
 

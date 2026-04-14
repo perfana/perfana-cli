@@ -40,16 +40,16 @@ type FullConfig struct {
 
 // TestConfig holds test-level settings from YAML.
 type TestConfig struct {
-	SystemUnderTest  string                    `yaml:"systemUnderTest"`
-	Environment      string                    `yaml:"environment"`
-	Workload         string                    `yaml:"workload"`
-	Version          string                    `yaml:"version"`
-	RampupTime       string                    `yaml:"rampupTime"`
-	ConstantLoadTime string                    `yaml:"constantLoadTime"`
-	Tags             []string                  `yaml:"tags"`
-	Annotations      string                    `yaml:"annotations"`
-	DeepLinks        []perfana_client.DeepLink `yaml:"deepLinks"`
-	Variables        []VariableConfig          `yaml:"variables"`
+	SystemUnderTest     string                    `yaml:"systemUnderTest"`
+	Environment         string                    `yaml:"environment"`
+	Workload            string                    `yaml:"workload"`
+	Version             string                    `yaml:"version"`
+	AnalysisStartOffset string                    `yaml:"analysisStartOffset"`
+	ConstantLoadTime    string                    `yaml:"constantLoadTime"`
+	Tags                []string                  `yaml:"tags"`
+	Annotations         string                    `yaml:"annotations"`
+	DeepLinks           []perfana_client.DeepLink `yaml:"deepLinks"`
+	Variables           []VariableConfig          `yaml:"variables"`
 }
 
 // VariableConfig holds a placeholder/value pair from YAML.
@@ -83,14 +83,14 @@ type EventConfig struct {
 
 // Define command-line flags with default values
 var (
-	rampupTime       string
-	constantLoadTime string
-	tags             string
-	annotation       string
-	testVersion      string
-	buildResultsUrl  string
-	variablesFlag    []string
-	deepLinksFlag    []string
+	analysisStartOffset string
+	constantLoadTime    string
+	tags                string
+	annotation          string
+	testVersion         string
+	buildResultsUrl     string
+	variablesFlag       []string
+	deepLinksFlag       []string
 )
 
 // startCmd represents the start command
@@ -148,12 +148,12 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 		}
 
 		// CLI flags override YAML values
-		effectiveRampup := fullConfig.Test.RampupTime
-		if rampupTime != "" && rampupTime != "PT5M" {
-			effectiveRampup = rampupTime
+		effectiveAnalysisStartOffset := fullConfig.Test.AnalysisStartOffset
+		if analysisStartOffset != "" && analysisStartOffset != "PT5M" {
+			effectiveAnalysisStartOffset = analysisStartOffset
 		}
-		if effectiveRampup == "" {
-			effectiveRampup = "PT5M"
+		if effectiveAnalysisStartOffset == "" {
+			effectiveAnalysisStartOffset = "PT5M"
 		}
 
 		effectiveConstant := fullConfig.Test.ConstantLoadTime
@@ -182,9 +182,9 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 		}
 
 		// Parse durations
-		rampupSec, err := util.ParseISODurationToSeconds(effectiveRampup)
+		analysisStartOffsetSec, err := util.ParseISODurationToSeconds(effectiveAnalysisStartOffset)
 		if err != nil {
-			fmt.Printf("Error parsing rampupTime: %v\n", err)
+			fmt.Printf("Error parsing analysisStartOffset: %v\n", err)
 			return
 		}
 
@@ -194,9 +194,9 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			return
 		}
 
-		totalDurationSec := rampupSec + constantLoadSec
-		log.Printf("Starting Perfana run for %d seconds (rampup: %ds, constant: %ds)",
-			totalDurationSec, rampupSec, constantLoadSec)
+		totalDurationSec := analysisStartOffsetSec + constantLoadSec
+		log.Printf("Starting Perfana run for %d seconds (analysisStartOffset: %ds, constant: %ds)",
+			totalDurationSec, analysisStartOffsetSec, constantLoadSec)
 
 		// Initialize the Perfana client
 		client, err := perfana_client.NewClient(config)
@@ -234,7 +234,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			Tags:                tagList,
 			Variables:           variables,
 			Annotations:         effectiveAnnotation,
-			AnalysisStartOffset: effectiveRampup,
+			AnalysisStartOffset: effectiveAnalysisStartOffset,
 			Duration:            effectiveConstant,
 			BuildResultsUrl:     effectiveBuildResultsUrl,
 			DeepLinks:           fullConfig.Test.DeepLinks,
@@ -313,7 +313,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 func init() {
 	runCmd.AddCommand(startCmd)
 
-	startCmd.Flags().StringVar(&rampupTime, "rampupTime", "", "Ramp-up time in ISO8601 format (e.g., PT5M). Overrides YAML.")
+	startCmd.Flags().StringVar(&analysisStartOffset, "analysisStartOffset", "", "Offset before analysis starts (typically the ramp-up window) in ISO8601 format (e.g., PT5M). Overrides YAML.")
 	startCmd.Flags().StringVar(&constantLoadTime, "constantLoadTime", "", "Constant load time in ISO8601 format (e.g., PT15M). Overrides YAML.")
 	startCmd.Flags().StringVar(&tags, "tags", "", "Comma-separated tags to add to the test session (merged with YAML tags)")
 	startCmd.Flags().StringVar(&annotation, "annotation", "", "Annotation message for the test session")

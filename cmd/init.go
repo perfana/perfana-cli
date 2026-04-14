@@ -185,7 +185,7 @@ test:
   environment: "loadtest"               # Test environment name
   workload: "peak-hours"                # Workload profile name
   version: "1.0.0"                      # Application version
-  rampupTime: "PT2M"                    # Ramp-up duration (ISO 8601)
+  analysisStartOffset: "PT2M"           # Offset before analysis starts (typically the ramp-up window, ISO 8601)
   constantLoadTime: "PT15M"             # Constant load duration (ISO 8601)
   tags:
     - "nightly"

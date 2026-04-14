@@ -14,7 +14,7 @@ test:
   environment: "loadtest"
   workload: "peak-hours"
   version: "1.0.0"
-  rampupTime: "PT2M"
+  analysisStartOffset: "PT2M"
   constantLoadTime: "PT15M"
   tags:
     - "nightly"

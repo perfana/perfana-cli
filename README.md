@@ -40,7 +40,7 @@ Start a test run:
 
 ```bash
 perfana-cli run start \
-  --rampupTime=PT5M \
+  --analysisStartOffset=PT5M \
   --constantLoadTime=PT15M \
   --tags="k6,spring-boot" \
   --version="2.0.1" \
@@ -79,7 +79,7 @@ test:
   environment: test
   workload: loadTest
   version: "2.0.1"
-  rampupTime: PT5M
+  analysisStartOffset: PT5M
   constantLoadTime: PT15M
   tags:
     - k6
@@ -124,7 +124,7 @@ Use `perfana/perfana-cli` directly in your GitHub Actions workflows:
   with:
     command: run start
     config: perfana.yaml
-    args: --rampupTime=PT5M --constantLoadTime=PT15M
+    args: --analysisStartOffset=PT5M --constantLoadTime=PT15M
 ```
 
 ### Inputs
@@ -150,7 +150,7 @@ test:
   systemUnderTest: my-service
   environment: test
   workload: loadTest
-  rampupTime: PT5M
+  analysisStartOffset: PT5M
   constantLoadTime: PT15M
   tags:
     - ci

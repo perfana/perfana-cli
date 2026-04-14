@@ -74,9 +74,9 @@ func runValidate(configPath string) error {
 	}
 
 	// Validate durations
-	if config.Test.RampupTime != "" {
-		if _, err := util.ParseISODurationToSeconds(config.Test.RampupTime); err != nil {
-			errors = append(errors, fmt.Sprintf("test.rampupTime: invalid ISO 8601 duration %q: %v", config.Test.RampupTime, err))
+	if config.Test.AnalysisStartOffset != "" {
+		if _, err := util.ParseISODurationToSeconds(config.Test.AnalysisStartOffset); err != nil {
+			errors = append(errors, fmt.Sprintf("test.analysisStartOffset: invalid ISO 8601 duration %q: %v", config.Test.AnalysisStartOffset, err))
 		}
 	}
 	if config.Test.ConstantLoadTime != "" {
