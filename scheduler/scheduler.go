@@ -15,13 +15,13 @@ import (
 // EventScheduler orchestrates the full test lifecycle:
 // BeforeTest → StartTest → KeepAlive loop (+ scheduled events) → CheckResults → AfterTest
 type EventScheduler struct {
-	Client                *perfana_client.PerfanaClient
-	Events                []Event
-	ScheduleEntries       []ScheduleEntry
-	KeepAliveIntervalSec  int
-	TestDurationSec       int
-	TestContext           TestContext
-	FailOnError           bool
+	Client               *perfana_client.PerfanaClient
+	Events               []Event
+	ScheduleEntries      []ScheduleEntry
+	KeepAliveIntervalSec int
+	TestDurationSec      int
+	TestContext          TestContext
+	FailOnError          bool
 
 	testRunID string
 }
@@ -227,6 +227,7 @@ func (s *EventScheduler) startScheduleTimers() []*time.Timer {
 			perfanaEvent := perfana_client.PerfanaEvent{
 				SystemUnderTest: s.TestContext.SystemUnderTest,
 				TestEnvironment: s.TestContext.Environment,
+				Workload:        s.TestContext.Workload,
 				Title:           title,
 				Description:     fmt.Sprintf("Scheduled event: %s", entry.EventName),
 				Tags:            s.TestContext.Tags,
@@ -273,6 +274,28 @@ func (s *EventScheduler) buildAdditionalData() map[string]interface{} {
 	}
 	if s.TestContext.Version != "" {
 		data["version"] = s.TestContext.Version
+	}
+	if s.TestContext.Annotations != "" {
+		data["annotations"] = s.TestContext.Annotations
+	}
+	if s.TestContext.AnalysisStartOffset != "" {
+		data["analysisStartOffset"] = s.TestContext.AnalysisStartOffset
+	}
+	if s.TestContext.Duration != "" {
+		data["duration"] = s.TestContext.Duration
+	}
+	if s.TestContext.BuildResultsUrl != "" {
+		data["cibuildResultsUrl"] = s.TestContext.BuildResultsUrl
+	}
+	if len(s.TestContext.DeepLinks) > 0 {
+		data["deepLinks"] = s.TestContext.DeepLinks
+	}
+	if len(s.TestContext.Variables) > 0 {
+		vars := make([]perfana_client.Variable, 0, len(s.TestContext.Variables))
+		for k, v := range s.TestContext.Variables {
+			vars = append(vars, perfana_client.Variable{Placeholder: k, Value: v})
+		}
+		data["variables"] = vars
 	}
 	return data
 }

@@ -16,6 +16,7 @@ import (
 type PerfanaEvent struct {
 	SystemUnderTest string   `json:"systemUnderTest"`
 	TestEnvironment string   `json:"testEnvironment"`
+	Workload        string   `json:"workload"`
 	Title           string   `json:"title"`
 	Description     string   `json:"description"`
 	Tags            []string `json:"tags,omitempty"`
@@ -23,20 +24,20 @@ type PerfanaEvent struct {
 
 // PerfanaMessage represents the JSON payload sent to start a session
 type PerfanaMessage struct {
-	TestRunID         string     `json:"testRunId"`
-	Workload          string     `json:"workload"`
-	TestEnvironment   string     `json:"testEnvironment"`
-	SystemUnderTest   string     `json:"systemUnderTest"`
-	Version           string     `json:"version,omitempty"`           // Optional
-	CIBuildResultsURL string     `json:"CIBuildResultsUrl,omitempty"` // Optional
-	RampUp            string     `json:"rampUp,omitempty"`            // Optional (e.g., "PT5M" for a 5-minute ramp-up)
-	Duration          string     `json:"duration,omitempty"`          // Optional (e.g., "PT30M" for 30 minutes)
-	Completed         bool       `json:"completed"`
-	Abort             bool       `json:"abort,omitempty"`
-	Annotations       string     `json:"annotations,omitempty"` // Optional
-	Tags              []string   `json:"tags,omitempty"`        // Optional
-	Variables         []Variable `json:"variables,omitempty"`   // Optional
-	DeepLinks         []DeepLink `json:"deepLinks,omitempty"`   // Optional
+	TestRunID           string     `json:"testRunId"`
+	Workload            string     `json:"workload"`
+	TestEnvironment     string     `json:"testEnvironment"`
+	SystemUnderTest     string     `json:"systemUnderTest"`
+	Version             string     `json:"version,omitempty"`             // Optional
+	CIBuildResultsURL   string     `json:"CIBuildResultsUrl,omitempty"`   // Optional
+	AnalysisStartOffset string     `json:"analysisStartOffset,omitempty"` // Optional (e.g., "PT5M" for a 5-minute ramp-up)
+	Duration            string     `json:"duration,omitempty"`            // Optional (e.g., "PT30M" for 30 minutes)
+	Completed           bool       `json:"completed"`
+	Abort               bool       `json:"abort,omitempty"`
+	Annotations         string     `json:"annotations,omitempty"` // Optional
+	Tags                []string   `json:"tags,omitempty"`        // Optional
+	Variables           []Variable `json:"variables,omitempty"`   // Optional
+	DeepLinks           []DeepLink `json:"deepLinks,omitempty"`   // Optional
 }
 
 // Variable is used in PerfanaMessage to send key-value pairs
@@ -169,8 +170,8 @@ func (c *PerfanaClient) TestEvent(testRunID string, additionalData map[string]in
 	if cibuildResultsUrl, ok := additionalData["cibuildResultsUrl"]; ok {
 		message.CIBuildResultsURL = cibuildResultsUrl.(string)
 	}
-	if rampUp, ok := additionalData["rampUp"]; ok {
-		message.RampUp = rampUp.(string)
+	if analysisStartOffset, ok := additionalData["analysisStartOffset"]; ok {
+		message.AnalysisStartOffset = analysisStartOffset.(string)
 	}
 	if duration, ok := additionalData["duration"]; ok {
 		message.Duration = duration.(string)
@@ -289,8 +290,9 @@ func (c *PerfanaClient) GetTestRunStatus(testRunID string) (string, error) {
 // ConfigKeyRequest represents a single key-value config upload.
 type ConfigKeyRequest struct {
 	TestRunID       string   `json:"testRunId"`
-	Application     string   `json:"application"`
+	SystemUnderTest string   `json:"systemUnderTest"`
 	TestEnvironment string   `json:"testEnvironment"`
+	Workload        string   `json:"workload"`
 	Key             string   `json:"key"`
 	Value           string   `json:"value"`
 	Tags            []string `json:"tags,omitempty"`
@@ -299,8 +301,9 @@ type ConfigKeyRequest struct {
 // ConfigKeysRequest represents a multi key-value config upload.
 type ConfigKeysRequest struct {
 	TestRunID       string       `json:"testRunId"`
-	Application     string       `json:"application"`
+	SystemUnderTest string       `json:"systemUnderTest"`
 	TestEnvironment string       `json:"testEnvironment"`
+	Workload        string       `json:"workload"`
 	ConfigItems     []ConfigItem `json:"configItems"`
 	Tags            []string     `json:"tags,omitempty"`
 }
@@ -314,8 +317,9 @@ type ConfigItem struct {
 // ConfigJSONRequest represents a JSON config upload with regex filters.
 type ConfigJSONRequest struct {
 	TestRunID       string      `json:"testRunId"`
-	Application     string      `json:"application"`
+	SystemUnderTest string      `json:"systemUnderTest"`
 	TestEnvironment string      `json:"testEnvironment"`
+	Workload        string      `json:"workload"`
 	JSON            interface{} `json:"json"`
 	Includes        []string    `json:"includes,omitempty"`
 	Excludes        []string    `json:"excludes,omitempty"`
@@ -323,13 +327,14 @@ type ConfigJSONRequest struct {
 }
 
 // SendConfigKey uploads a single key-value config to Perfana.
-func (c *PerfanaClient) SendConfigKey(testRunID, application, testEnvironment, key, value string, tags []string) error {
+func (c *PerfanaClient) SendConfigKey(testRunID, systemUnderTest, testEnvironment, workload, key, value string, tags []string) error {
 	url := fmt.Sprintf("%s/api/config/key", c.config.BaseUrl)
 
 	reqBody, err := json.Marshal(ConfigKeyRequest{
 		TestRunID:       testRunID,
-		Application:     application,
+		SystemUnderTest: systemUnderTest,
 		TestEnvironment: testEnvironment,
+		Workload:        workload,
 		Key:             key,
 		Value:           value,
 		Tags:            tags,
@@ -343,13 +348,14 @@ func (c *PerfanaClient) SendConfigKey(testRunID, application, testEnvironment, k
 }
 
 // SendConfigKeys uploads multiple key-value configs to Perfana.
-func (c *PerfanaClient) SendConfigKeys(testRunID, application, testEnvironment string, items []ConfigItem, tags []string) error {
+func (c *PerfanaClient) SendConfigKeys(testRunID, systemUnderTest, testEnvironment, workload string, items []ConfigItem, tags []string) error {
 	url := fmt.Sprintf("%s/api/config/keys", c.config.BaseUrl)
 
 	reqBody, err := json.Marshal(ConfigKeysRequest{
 		TestRunID:       testRunID,
-		Application:     application,
+		SystemUnderTest: systemUnderTest,
 		TestEnvironment: testEnvironment,
+		Workload:        workload,
 		ConfigItems:     items,
 		Tags:            tags,
 	})
@@ -362,13 +368,14 @@ func (c *PerfanaClient) SendConfigKeys(testRunID, application, testEnvironment s
 }
 
 // SendConfigJSON uploads JSON config with regex filters to Perfana.
-func (c *PerfanaClient) SendConfigJSON(testRunID, application, testEnvironment string, jsonData interface{}, includes, excludes, tags []string) error {
+func (c *PerfanaClient) SendConfigJSON(testRunID, systemUnderTest, testEnvironment, workload string, jsonData interface{}, includes, excludes, tags []string) error {
 	url := fmt.Sprintf("%s/api/config/json", c.config.BaseUrl)
 
 	reqBody, err := json.Marshal(ConfigJSONRequest{
 		TestRunID:       testRunID,
-		Application:     application,
+		SystemUnderTest: systemUnderTest,
 		TestEnvironment: testEnvironment,
+		Workload:        workload,
 		JSON:            jsonData,
 		Includes:        includes,
 		Excludes:        excludes,

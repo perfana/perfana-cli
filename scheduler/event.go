@@ -4,14 +4,19 @@ import "perfana-cli/perfana_client"
 
 // TestContext holds the runtime context passed to each event lifecycle method.
 type TestContext struct {
-	TestRunID       string
-	SystemUnderTest string
-	Environment     string
-	Workload        string
-	Version         string
-	Tags            []string
-	Variables       map[string]string
-	Client          *perfana_client.PerfanaClient
+	TestRunID           string
+	SystemUnderTest     string
+	Environment         string
+	Workload            string
+	Version             string
+	Tags                []string
+	Variables           map[string]string
+	Annotations         string
+	AnalysisStartOffset string
+	Duration            string
+	BuildResultsUrl     string
+	DeepLinks           []perfana_client.DeepLink
+	Client              *perfana_client.PerfanaClient
 }
 
 // Event defines the lifecycle interface for test events.

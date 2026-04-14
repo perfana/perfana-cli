@@ -51,7 +51,7 @@ func NewConfigCollectorEvent(cfg ConfigCollectorConfig) *ConfigCollectorEvent {
 	}
 }
 
-func (e *ConfigCollectorEvent) Name() string                        { return e.name }
+func (e *ConfigCollectorEvent) Name() string                           { return e.name }
 func (e *ConfigCollectorEvent) IsContinueOnKeepAliveParticipant() bool { return false }
 
 // BeforeTest runs the config collection command and uploads to Perfana.
@@ -78,11 +78,11 @@ func (e *ConfigCollectorEvent) BeforeTest(ctx scheduler.TestContext) error {
 	return e.uploadConfig(ctx, stdout)
 }
 
-func (e *ConfigCollectorEvent) StartTest(ctx scheduler.TestContext) error  { return nil }
-func (e *ConfigCollectorEvent) KeepAlive(ctx scheduler.TestContext) error  { return nil }
+func (e *ConfigCollectorEvent) StartTest(ctx scheduler.TestContext) error    { return nil }
+func (e *ConfigCollectorEvent) KeepAlive(ctx scheduler.TestContext) error    { return nil }
 func (e *ConfigCollectorEvent) CheckResults(ctx scheduler.TestContext) error { return nil }
-func (e *ConfigCollectorEvent) AfterTest(ctx scheduler.TestContext) error  { return nil }
-func (e *ConfigCollectorEvent) AbortTest(ctx scheduler.TestContext) error  { return nil }
+func (e *ConfigCollectorEvent) AfterTest(ctx scheduler.TestContext) error    { return nil }
+func (e *ConfigCollectorEvent) AbortTest(ctx scheduler.TestContext) error    { return nil }
 
 func (e *ConfigCollectorEvent) OnEvent(ctx scheduler.TestContext, settings map[string]string) error {
 	return nil
@@ -93,13 +93,14 @@ func (e *ConfigCollectorEvent) uploadConfig(ctx scheduler.TestContext, stdout st
 	client := ctx.Client
 	testRunID := ctx.TestRunID
 
-	application := ctx.SystemUnderTest
+	systemUnderTest := ctx.SystemUnderTest
 	environment := ctx.Environment
+	workload := ctx.Workload
 
 	switch e.output {
 	case "key":
 		log.Printf("[%s] Uploading single key: %s", e.name, e.key)
-		return client.SendConfigKey(testRunID, application, environment, e.key, stdout, e.tags)
+		return client.SendConfigKey(testRunID, systemUnderTest, environment, workload, e.key, stdout, e.tags)
 
 	case "keys":
 		items := parseKeyValueLines(stdout)
@@ -108,7 +109,7 @@ func (e *ConfigCollectorEvent) uploadConfig(ctx scheduler.TestContext, stdout st
 			return nil
 		}
 		log.Printf("[%s] Uploading %d config keys", e.name, len(items))
-		return client.SendConfigKeys(testRunID, application, environment, items, e.tags)
+		return client.SendConfigKeys(testRunID, systemUnderTest, environment, workload, items, e.tags)
 
 	case "json":
 		var jsonData interface{}
@@ -116,7 +117,7 @@ func (e *ConfigCollectorEvent) uploadConfig(ctx scheduler.TestContext, stdout st
 			return fmt.Errorf("config output is not valid JSON: %w", err)
 		}
 		log.Printf("[%s] Uploading JSON config", e.name)
-		return client.SendConfigJSON(testRunID, application, environment, jsonData, e.includes, e.excludes, e.tags)
+		return client.SendConfigJSON(testRunID, systemUnderTest, environment, workload, jsonData, e.includes, e.excludes, e.tags)
 
 	default:
 		return fmt.Errorf("unsupported output mode: %s (expected key, keys, or json)", e.output)

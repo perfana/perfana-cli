@@ -17,7 +17,7 @@ test:
   environment: "loadtest"
   workload: "peak-hours"
   version: "1.0.0"
-  rampupTime: "PT2M"
+  analysisStartOffset: "PT2M"
   constantLoadTime: "PT15M"
   tags:
     - "nightly"
@@ -76,7 +76,7 @@ events:
 | `environment` | Yes | | Test environment identifier |
 | `workload` | Yes | | Workload name |
 | `version` | No | | Version of the system under test |
-| `rampupTime` | No | `PT5M` | Ramp-up duration (ISO 8601) |
+| `analysisStartOffset` | No | `PT5M` | Offset before analysis starts (typically the ramp-up window, ISO 8601) |
 | `constantLoadTime` | No | `PT15M` | Constant load duration (ISO 8601) |
 | `tags` | No | | List of tags for filtering and grouping |
 | `annotations` | No | | Free-text annotation for the test run |
