@@ -30,7 +30,7 @@ type PerfanaMessage struct {
 	SystemUnderTest   string     `json:"systemUnderTest"`
 	Version           string     `json:"version,omitempty"`           // Optional
 	CIBuildResultsURL string     `json:"CIBuildResultsUrl,omitempty"` // Optional
-	RampUp            string     `json:"rampUp,omitempty"`            // Optional (e.g., "PT5M" for a 5-minute ramp-up)
+	AnalysisStartOffset string   `json:"analysisStartOffset,omitempty"` // Optional (e.g., "PT5M" for a 5-minute ramp-up)
 	Duration          string     `json:"duration,omitempty"`          // Optional (e.g., "PT30M" for 30 minutes)
 	Completed         bool       `json:"completed"`
 	Abort             bool       `json:"abort,omitempty"`
@@ -170,8 +170,8 @@ func (c *PerfanaClient) TestEvent(testRunID string, additionalData map[string]in
 	if cibuildResultsUrl, ok := additionalData["cibuildResultsUrl"]; ok {
 		message.CIBuildResultsURL = cibuildResultsUrl.(string)
 	}
-	if rampUp, ok := additionalData["rampUp"]; ok {
-		message.RampUp = rampUp.(string)
+	if analysisStartOffset, ok := additionalData["analysisStartOffset"]; ok {
+		message.AnalysisStartOffset = analysisStartOffset.(string)
 	}
 	if duration, ok := additionalData["duration"]; ok {
 		message.Duration = duration.(string)

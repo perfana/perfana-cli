@@ -234,7 +234,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			Tags:            tagList,
 			Variables:       variables,
 			Annotations:     effectiveAnnotation,
-			RampUp:          effectiveRampup,
+			AnalysisStartOffset: effectiveRampup,
 			Duration:        effectiveConstant,
 			BuildResultsUrl: effectiveBuildResultsUrl,
 			DeepLinks:       fullConfig.Test.DeepLinks,

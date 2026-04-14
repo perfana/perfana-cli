@@ -12,7 +12,7 @@ type TestContext struct {
 	Tags            []string
 	Variables       map[string]string
 	Annotations     string
-	RampUp          string
+	AnalysisStartOffset string
 	Duration        string
 	BuildResultsUrl string
 	DeepLinks       []perfana_client.DeepLink
