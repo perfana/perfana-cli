@@ -1,0 +1,39 @@
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/perfana-cli .
+
+FROM eclipse-temurin:17-jre-jammy
+
+ARG JMETER_VERSION=5.6.3
+ARG JMETER_HOME=/opt/jmeter
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl tar bash procps tzdata && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd --gid 1000 perfana && useradd --uid 1000 --gid 1000 --create-home perfana && \
+    curl -fsSL "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz" -o /tmp/jmeter.tgz && \
+    mkdir -p /opt && \
+    tar -xzf /tmp/jmeter.tgz -C /opt && \
+    mv "/opt/apache-jmeter-${JMETER_VERSION}" "${JMETER_HOME}" && \
+    rm -f /tmp/jmeter.tgz
+
+COPY --from=builder /out/perfana-cli /usr/local/bin/perfana-cli
+COPY docker/jmeter-entrypoint.sh /usr/local/bin/jmeter-entrypoint.sh
+
+ENV JMETER_HOME=${JMETER_HOME}
+ENV PATH="${JMETER_HOME}/bin:/usr/local/bin:${PATH}"
+
+WORKDIR /workspace
+RUN mkdir -p /tests/target/results /tests/target/reports && \
+    chmod +x /usr/local/bin/jmeter-entrypoint.sh && \
+    chown -R perfana:perfana /tests
+USER perfana
+
+ENTRYPOINT ["/usr/local/bin/jmeter-entrypoint.sh"]
