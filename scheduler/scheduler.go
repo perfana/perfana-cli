@@ -278,10 +278,10 @@ func (s *EventScheduler) buildAdditionalData() map[string]interface{} {
 	if s.TestContext.Annotations != "" {
 		data["annotations"] = s.TestContext.Annotations
 	}
-	if s.TestContext.AnalysisStartOffset != "" {
+	if s.TestContext.AnalysisStartOffset > 0 {
 		data["analysisStartOffset"] = s.TestContext.AnalysisStartOffset
 	}
-	if s.TestContext.Duration != "" {
+	if s.TestContext.Duration > 0 {
 		data["duration"] = s.TestContext.Duration
 	}
 	if s.TestContext.BuildResultsUrl != "" {

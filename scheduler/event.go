@@ -12,8 +12,8 @@ type TestContext struct {
 	Tags                []string
 	Variables           map[string]string
 	Annotations         string
-	AnalysisStartOffset string
-	Duration            string
+	AnalysisStartOffset int
+	Duration            int
 	BuildResultsUrl     string
 	DeepLinks           []perfana_client.DeepLink
 	Client              *perfana_client.PerfanaClient
