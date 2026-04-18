@@ -70,7 +70,7 @@ func NewClient(config Configuration) (*PerfanaClient, error) {
 	if !config.MTLS.Enabled {
 		// Default HTTP Client
 		httpClient := &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 30 * time.Second,
 		}
 		return &PerfanaClient{
 			httpClient: httpClient,
@@ -109,7 +109,7 @@ func createTLSClient(config Configuration) (*http.Client, error) {
 
 	// Return a client with the transport
 	return &http.Client{
-		Timeout:   10 * time.Second,
+		Timeout:   30 * time.Second,
 		Transport: transport,
 	}, nil
 }
@@ -254,7 +254,7 @@ func normalizeDurationToSeconds(raw interface{}) (int, error) {
 func (c *PerfanaClient) makeRequest(method, url string, body io.Reader) ([]byte, error) {
 
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
@@ -442,7 +442,7 @@ func (c *PerfanaClient) SendPerfanaEvent(event PerfanaEvent) (string, error) {
 	}
 
 	// Create a context with a timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Create the HTTP request
