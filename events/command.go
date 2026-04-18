@@ -2,7 +2,8 @@ package events
 
 import (
 	"fmt"
-	"log"
+	"perfana-cli/logger"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -83,7 +84,6 @@ func (e *CommandEvent) OnEvent(ctx scheduler.TestContext, settings map[string]st
 	// Build a command from settings if present, otherwise no-op
 	cmd, ok := settings["command"]
 	if !ok {
-		log.Printf("[%s] OnEvent: no command in settings, skipping", e.name)
 		return nil
 	}
 	return e.runCommand(ctx, cmd, "OnEvent")
@@ -109,23 +109,21 @@ func (e *CommandEvent) runCommandAsync(ctx scheduler.TestContext, command, phase
 	}
 
 	expanded := substituteVariables(command, ctx)
-	log.Printf("[%s] %s (async): %s", e.name, phase, expanded)
+	logger.Info("running command async", "event", e.name, "phase", phase)
 
 	cmd := exec.Command("sh", "-c", expanded)
-	cmd.Stdout = log.Writer()
-	cmd.Stderr = log.Writer()
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("command failed to start: %w", err)
 	}
 
-	// Monitor in background — log when it exits
 	go func() {
-		err := cmd.Wait()
-		if err != nil {
-			log.Printf("[%s] %s (async) exited with error: %v", e.name, phase, err)
+		if err := cmd.Wait(); err != nil {
+			logger.Warn("async command error", "event", e.name, "phase", phase, "err", err)
 		} else {
-			log.Printf("[%s] %s (async) completed", e.name, phase)
+			logger.Info("async command completed", "event", e.name, "phase", phase)
 		}
 	}()
 
@@ -138,14 +136,12 @@ func (e *CommandEvent) runCommand(ctx scheduler.TestContext, command, phase stri
 		return nil
 	}
 
-	// Variable substitution
 	expanded := substituteVariables(command, ctx)
-
-	log.Printf("[%s] %s: %s", e.name, phase, expanded)
+	logger.Info("running command", "event", e.name, "phase", phase)
 
 	cmd := exec.Command("sh", "-c", expanded)
-	cmd.Stdout = log.Writer()
-	cmd.Stderr = log.Writer()
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("command failed: %w", err)

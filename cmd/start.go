@@ -17,7 +17,7 @@ package cmd
 
 import (
 	"fmt"
-	"log"
+	"perfana-cli/logger"
 	"os"
 	"path/filepath"
 	"strings"
@@ -195,8 +195,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 		}
 
 		totalDurationSec := analysisStartOffsetSec + constantLoadSec
-		log.Printf("Starting Perfana run for %d seconds (analysisStartOffset: %ds, constant: %ds)",
-			totalDurationSec, analysisStartOffsetSec, constantLoadSec)
+		logger.Info("starting test run", "durationSec", totalDurationSec, "analysisStartOffsetSec", analysisStartOffsetSec, "constantLoadSec", constantLoadSec)
 
 		// Initialize the Perfana client
 		client, err := perfana_client.NewClient(config)
@@ -252,7 +251,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 					ContinueOnKeepAliveParticipant: ec.ContinueOnKeepAliveParticipant,
 					Commands:                       ec.Commands,
 				}))
-				log.Printf("Registered command event: %s", ec.Name)
+				logger.Debug("registered event", "type", "command", "name", ec.Name)
 
 			case "config-collector":
 				eventList = append(eventList, events.NewConfigCollectorEvent(events.ConfigCollectorConfig{
@@ -265,10 +264,10 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 					Excludes: ec.Excludes,
 					Tags:     ec.Tags,
 				}))
-				log.Printf("Registered config-collector event: %s", ec.Name)
+				logger.Debug("registered event", "type", "config-collector", "name", ec.Name)
 
 			default:
-				log.Printf("Warning: unknown event type %q for event %q, skipping", ec.Type, ec.Name)
+				logger.Warn("unknown event type, skipping", "type", ec.Type, "name", ec.Name)
 			}
 		}
 
@@ -280,7 +279,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 				fmt.Printf("Error parsing schedule script: %v\n", err)
 				return
 			}
-			log.Printf("Parsed %d schedule entries", len(scheduleEntries))
+			logger.Info("schedule parsed", "entries", len(scheduleEntries))
 		}
 
 		keepAliveInterval := fullConfig.Scheduler.KeepAliveIntervalSeconds
@@ -299,8 +298,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			FailOnError:          fullConfig.Scheduler.FailOnError,
 		}
 
-		log.Printf("Event scheduler configured: %d events, %d schedule entries, keepAlive=%ds",
-			len(eventList), len(scheduleEntries), keepAliveInterval)
+		logger.Info("scheduler configured", "events", len(eventList), "scheduleEntries", len(scheduleEntries), "keepAliveIntervalSec", keepAliveInterval)
 
 		// Run the full lifecycle
 		if err := eventScheduler.Run(); err != nil {

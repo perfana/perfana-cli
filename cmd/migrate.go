@@ -3,7 +3,7 @@ package cmd
 import (
 	"encoding/xml"
 	"fmt"
-	"log"
+	"perfana-cli/logger"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -233,7 +233,7 @@ func runMigrate(inputPath, outputPath string) error {
 		if len(pomPaths) == 0 {
 			return fmt.Errorf("no pom.xml found in %s", inputPath)
 		}
-		log.Printf("Found %d pom.xml files", len(pomPaths))
+		logger.Info("found pom.xml files", "count", len(pomPaths))
 	} else {
 		pomPaths = []string{inputPath}
 	}
@@ -242,7 +242,7 @@ func runMigrate(inputPath, outputPath string) error {
 	for _, pomPath := range pomPaths {
 		migrated, warnings, profiles, err := migratePom(pomPath)
 		if err != nil {
-			log.Printf("Skipping %s: %v", pomPath, err)
+			logger.Warn("skipping pom", "path", pomPath, "err", err)
 			continue
 		}
 
@@ -263,31 +263,28 @@ func runMigrate(inputPath, outputPath string) error {
 			return fmt.Errorf("failed to write %s: %w", outputPath, err)
 		}
 
-		log.Printf("Migration complete: %s → %s", pomPath, outputPath)
+		logger.Info("migration complete", "source", pomPath, "output", outputPath)
 
 		// Write profile .env files
 		if len(profiles) > 0 {
 			outputDir := filepath.Dir(outputPath)
 			profileDir := filepath.Join(outputDir, "profiles")
 			if err := os.MkdirAll(profileDir, 0755); err != nil {
-				log.Printf("Warning: could not create profiles directory: %v", err)
+				logger.Warn("could not create profiles directory", "err", err)
 			} else {
 				for profileID, envVars := range profiles {
 					envPath := filepath.Join(profileDir, profileID+".env")
 					if err := os.WriteFile(envPath, []byte(envVars), 0644); err != nil {
-						log.Printf("Warning: could not write %s: %v", envPath, err)
+						logger.Warn("could not write profile", "path", envPath, "err", err)
 					} else {
-						log.Printf("Profile: %s", envPath)
+						logger.Info("wrote profile", "path", envPath)
 					}
 				}
 			}
 		}
 
-		if len(warnings) > 0 {
-			log.Printf("Warnings (%d):", len(warnings))
-			for _, w := range warnings {
-				log.Printf("  - %s", w)
-			}
+		for _, w := range warnings {
+			logger.Warn("migration warning", "msg", w)
 		}
 		return nil
 	}
@@ -331,7 +328,7 @@ func migratePom(pomPath string) (*MigratedConfig, []string, map[string]string, e
 		for name := range profileOverrides {
 			names = append(names, name)
 		}
-		log.Printf("Profile-overridden properties (will use env vars): %s", strings.Join(names, ", "))
+		logger.Info("profile-overridden properties will use env vars", "names", strings.Join(names, ", "))
 	}
 
 	// Find any plugin that contains an eventSchedulerConfig
@@ -473,7 +470,7 @@ func migratePom(pomPath string) (*MigratedConfig, []string, map[string]string, e
 
 		case strings.Contains(impl, "PerfanaEventConfig"):
 			// Skip — handled natively by perfana-cli
-			log.Printf("Skipping PerfanaEventConfig %q (handled natively)", name)
+			logger.Debug("skipping PerfanaEventConfig, handled natively", "name", name)
 
 		case strings.Contains(impl, "SpringBootEventConfig"):
 			warnings = append(warnings, fmt.Sprintf("SpringBootEventConfig %q needs manual migration to command type (actuator URL: %s)", name, ec.ActuatorBaseUrl))

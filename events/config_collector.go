@@ -3,7 +3,7 @@ package events
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"perfana-cli/logger"
 	"os/exec"
 	"strings"
 
@@ -61,7 +61,7 @@ func (e *ConfigCollectorEvent) BeforeTest(ctx scheduler.TestContext) error {
 	}
 
 	expanded := substituteVariables(e.command, ctx)
-	log.Printf("[%s] Collecting config: %s", e.name, expanded)
+	logger.Info("collecting config", "event", e.name)
 
 	cmd := exec.Command("sh", "-c", expanded)
 	output, err := cmd.Output()
@@ -71,7 +71,7 @@ func (e *ConfigCollectorEvent) BeforeTest(ctx scheduler.TestContext) error {
 
 	stdout := strings.TrimSpace(string(output))
 	if stdout == "" {
-		log.Printf("[%s] Config command produced no output, skipping upload", e.name)
+		logger.Info("no config output, skipping upload", "event", e.name)
 		return nil
 	}
 
@@ -99,16 +99,15 @@ func (e *ConfigCollectorEvent) uploadConfig(ctx scheduler.TestContext, stdout st
 
 	switch e.output {
 	case "key":
-		log.Printf("[%s] Uploading single key: %s", e.name, e.key)
+		logger.Info("uploading config", "event", e.name, "key", e.key)
 		return client.SendConfigKey(testRunID, systemUnderTest, environment, workload, e.key, stdout, e.tags)
 
 	case "keys":
 		items := parseKeyValueLines(stdout)
 		if len(items) == 0 {
-			log.Printf("[%s] No key=value pairs found in output", e.name)
 			return nil
 		}
-		log.Printf("[%s] Uploading %d config keys", e.name, len(items))
+		logger.Info("uploading config keys", "event", e.name, "count", len(items))
 		return client.SendConfigKeys(testRunID, systemUnderTest, environment, workload, items, e.tags)
 
 	case "json":
@@ -116,7 +115,7 @@ func (e *ConfigCollectorEvent) uploadConfig(ctx scheduler.TestContext, stdout st
 		if err := json.Unmarshal([]byte(stdout), &jsonData); err != nil {
 			return fmt.Errorf("config output is not valid JSON: %w", err)
 		}
-		log.Printf("[%s] Uploading JSON config", e.name)
+		logger.Info("uploading config json", "event", e.name)
 		return client.SendConfigJSON(testRunID, systemUnderTest, environment, workload, jsonData, e.includes, e.excludes, e.tags)
 
 	default:

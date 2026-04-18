@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"fmt"
-	"log"
+	"perfana-cli/logger"
 	"os"
 	"os/signal"
 	"sort"
@@ -36,7 +36,7 @@ func (s *EventScheduler) Run() error {
 	}
 	s.testRunID = testRunID
 	s.TestContext.TestRunID = testRunID
-	log.Printf("Perfana session initialized: testRunId=%s", testRunID)
+	logger.Info("session initialized", "testRunId", testRunID)
 
 	// 2. BeforeTest on all events
 	if err := s.runLifecyclePhase("BeforeTest", func(e Event) error {
@@ -55,7 +55,7 @@ func (s *EventScheduler) Run() error {
 
 	// Send initial test event to Perfana
 	if err := s.sendTestEvent(false); err != nil {
-		log.Printf("Warning: failed to send initial test event: %v", err)
+		logger.Warn("failed to send initial test event", "err", err)
 	}
 
 	// 4. KeepAlive loop with signal handling and scheduled events
@@ -65,22 +65,22 @@ func (s *EventScheduler) Run() error {
 		// 5a. AbortTest flow
 		s.runAbort()
 		if err := s.Client.AbortTest(s.testRunID, s.buildAdditionalData()); err != nil {
-			log.Printf("Warning: failed to send abort to Perfana: %v", err)
+			logger.Warn("failed to send abort", "err", err)
 		}
-		log.Println("Test aborted.")
+		logger.Info("test aborted")
 		return fmt.Errorf("test aborted by signal")
 	}
 
 	// 5b. Normal completion: send completed event to Perfana
 	if err := s.sendTestEvent(true); err != nil {
-		log.Printf("Warning: failed to send completion event: %v", err)
+		logger.Warn("failed to send completion event", "err", err)
 	}
 
 	// 6. CheckResults on all events
 	if err := s.runLifecyclePhase("CheckResults", func(e Event) error {
 		return e.CheckResults(s.TestContext)
 	}); err != nil {
-		log.Printf("CheckResults error: %v", err)
+		logger.Warn("check results error", "err", err)
 	}
 
 	// Check Perfana results
@@ -90,10 +90,10 @@ func (s *EventScheduler) Run() error {
 	if err := s.runLifecyclePhase("AfterTest", func(e Event) error {
 		return e.AfterTest(s.TestContext)
 	}); err != nil {
-		log.Printf("AfterTest error: %v", err)
+		logger.Warn("after test error", "err", err)
 	}
 
-	log.Println("Test completed successfully.")
+	logger.Info("test completed")
 	return nil
 }
 
@@ -101,9 +101,8 @@ func (s *EventScheduler) Run() error {
 // the first error stops execution.
 func (s *EventScheduler) runLifecyclePhase(phase string, fn func(Event) error) error {
 	for _, event := range s.Events {
-		log.Printf("[%s] %s", phase, event.Name())
 		if err := fn(event); err != nil {
-			log.Printf("[%s] %s error: %v", phase, event.Name(), err)
+			logger.Warn("event error", "phase", phase, "event", event.Name(), "err", err)
 			if s.FailOnError {
 				return fmt.Errorf("%s failed for event %s: %w", phase, event.Name(), err)
 			}
@@ -149,7 +148,7 @@ func (s *EventScheduler) runKeepAliveLoop() bool {
 		}
 	}
 	if keepAliveParticipantCount > 0 {
-		log.Printf("Keep-alive participants: %d (test stops when all signal done)", keepAliveParticipantCount)
+		logger.Info("keep-alive participants registered", "count", keepAliveParticipantCount)
 	}
 
 	// Track which keep-alive participants have signaled done
@@ -158,35 +157,31 @@ func (s *EventScheduler) runKeepAliveLoop() bool {
 	for {
 		select {
 		case <-testTimeout:
-			log.Println("Test duration reached.")
+			logger.Info("test duration reached")
 			return false
 
 		case <-sigChan:
-			log.Println("Signal received, aborting test...")
+			logger.Info("signal received, aborting")
 			return true
 
 		case <-keepAliveTicker.C:
-			// Send keep-alive to Perfana
 			if err := s.sendTestEvent(false); err != nil {
-				log.Printf("Warning: keep-alive send failed: %v", err)
+				logger.Warn("keep-alive failed", "err", err)
 			}
 
-			// Call KeepAlive on all events
 			for _, event := range s.Events {
 				if err := event.KeepAlive(s.TestContext); err != nil {
 					if event.IsContinueOnKeepAliveParticipant() && !keepAliveParticipantsDone[event.Name()] {
 						keepAliveParticipantsDone[event.Name()] = true
-						log.Printf("[KeepAlive] %s signaled done (%d/%d): %v",
-							event.Name(), len(keepAliveParticipantsDone), keepAliveParticipantCount, err)
+						logger.Info("participant done", "event", event.Name(), "done", len(keepAliveParticipantsDone), "total", keepAliveParticipantCount)
 					} else if !keepAliveParticipantsDone[event.Name()] {
-						log.Printf("[KeepAlive] %s error: %v", event.Name(), err)
+						logger.Warn("keep-alive error", "event", event.Name(), "err", err)
 					}
 				}
 			}
 
-			// Check if all keep-alive participants are done → stop test early
 			if keepAliveParticipantCount > 0 && len(keepAliveParticipantsDone) >= keepAliveParticipantCount {
-				log.Printf("All %d keep-alive participants done, stopping test.", keepAliveParticipantCount)
+				logger.Info("all participants done, stopping")
 				return false
 			}
 		}
@@ -207,19 +202,17 @@ func (s *EventScheduler) startScheduleTimers() []*time.Timer {
 	for _, entry := range sorted {
 		entry := entry // capture
 		t := time.AfterFunc(time.Duration(entry.Delay)*time.Second, func() {
-			log.Printf("[Schedule] Firing event %q (%s) at T+%ds", entry.EventName, entry.Description, entry.Delay)
+			logger.Info("firing scheduled event", "event", entry.EventName, "delaySeconds", entry.Delay)
 
-			// Find matching event and call OnEvent
 			for _, event := range s.Events {
 				if event.Name() == entry.EventName {
 					if err := event.OnEvent(s.TestContext, entry.Settings); err != nil {
-						log.Printf("[Schedule] OnEvent error for %s: %v", entry.EventName, err)
+						logger.Warn("scheduled event error", "event", entry.EventName, "err", err)
 					}
 					break
 				}
 			}
 
-			// Post to Perfana /events endpoint
 			title := entry.EventName
 			if entry.Description != "" {
 				title = entry.Description
@@ -233,7 +226,7 @@ func (s *EventScheduler) startScheduleTimers() []*time.Timer {
 				Tags:            s.TestContext.Tags,
 			}
 			if _, err := s.Client.SendPerfanaEvent(perfanaEvent); err != nil {
-				log.Printf("[Schedule] Failed to post event to Perfana: %v", err)
+				logger.Warn("failed to post event", "event", entry.EventName, "err", err)
 			}
 		})
 		timers = append(timers, t)
@@ -245,9 +238,8 @@ func (s *EventScheduler) startScheduleTimers() []*time.Timer {
 // runAbort calls AbortTest on all events.
 func (s *EventScheduler) runAbort() {
 	for _, event := range s.Events {
-		log.Printf("[AbortTest] %s", event.Name())
 		if err := event.AbortTest(s.TestContext); err != nil {
-			log.Printf("[AbortTest] %s error: %v", event.Name(), err)
+			logger.Warn("abort error", "event", event.Name(), "err", err)
 		}
 	}
 }
@@ -256,10 +248,10 @@ func (s *EventScheduler) runAbort() {
 func (s *EventScheduler) checkPerfanaResults() {
 	result, err := s.Client.GetTestRunStatus(s.testRunID)
 	if err != nil {
-		log.Printf("Warning: failed to check Perfana results: %v", err)
+		logger.Warn("failed to check results", "err", err)
 		return
 	}
-	log.Printf("Perfana test run result: %s", result)
+	logger.Info("test run result", "result", result)
 }
 
 // sendTestEvent sends a keep-alive or completion event to Perfana.

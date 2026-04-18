@@ -198,25 +198,13 @@ func (c *PerfanaClient) TestEvent(testRunID string, additionalData map[string]in
 		message.DeepLinks = deepLinks.([]DeepLink)
 	}
 
-	// Marshal the message to JSON
 	reqBody, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %v", err)
 	}
 
-	fmt.Printf("TestEvent request: %s\n", string(reqBody))
-
-	// Make the HTTP request
-	resp, err := c.makeRequest("POST", url, bytes.NewReader(reqBody))
-	if err != nil {
-		return err
-	}
-
-	// Typically, Perfana doesn't return extra data for this operation,
-	// but you can log or check the server's response body if needed.
-	fmt.Printf("TestEvent response: %s\n", string(resp))
-
-	return nil
+	_, err = c.makeRequest("POST", url, bytes.NewReader(reqBody))
+	return err
 }
 
 func normalizeDurationToSeconds(raw interface{}) (int, error) {
