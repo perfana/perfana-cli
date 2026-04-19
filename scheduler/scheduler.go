@@ -12,6 +12,14 @@ import (
 	"perfana-cli/perfana_client"
 )
 
+type stopReason int
+
+const (
+	stopNormal   stopReason = iota
+	stopSignal              // SIGINT / SIGTERM
+	stopUIAbort             // abort flag set on test run via Perfana UI
+)
+
 // EventScheduler orchestrates the full test lifecycle:
 // BeforeTest → StartTest → KeepAlive loop (+ scheduled events) → CheckResults → AfterTest
 type EventScheduler struct {
@@ -59,19 +67,29 @@ func (s *EventScheduler) Run() error {
 	}
 
 	// 4. KeepAlive loop with signal handling and scheduled events
-	aborted := s.runKeepAliveLoop()
+	reason := s.runKeepAliveLoop()
 
-	if aborted {
-		// 5a. AbortTest flow
+	switch reason {
+	case stopSignal:
+		// 5a. Local signal abort: notify events and Perfana.
 		s.runAbort()
 		if err := s.Client.AbortTest(s.testRunID, s.buildAdditionalData()); err != nil {
 			logger.Warn("failed to send abort", "err", err)
 		}
-		logger.Info("test aborted")
+		logger.Info("test aborted by signal")
 		return fmt.Errorf("test aborted by signal")
+
+	case stopUIAbort:
+		// 5b. UI abort: Perfana already owns the abort state; just clean up events.
+		s.runAbort()
+		_ = s.runLifecyclePhase("AfterTest", func(e Event) error {
+			return e.AfterTest(s.TestContext)
+		})
+		logger.Info("test aborted from UI, exiting gracefully")
+		return nil
 	}
 
-	// 5b. Normal completion: send completed event to Perfana
+	// 5c. Normal completion: send completed event to Perfana
 	if err := s.sendTestEvent(true); err != nil {
 		logger.Warn("failed to send completion event", "err", err)
 	}
@@ -84,7 +102,13 @@ func (s *EventScheduler) Run() error {
 	}
 
 	// Check Perfana results
-	s.checkPerfanaResults()
+	if err := s.checkPerfanaResults(); err != nil {
+		// Run AfterTest before returning the failure so cleanup still happens.
+		_ = s.runLifecyclePhase("AfterTest", func(e Event) error {
+			return e.AfterTest(s.TestContext)
+		})
+		return err
+	}
 
 	// 7. AfterTest on all events
 	if err := s.runLifecyclePhase("AfterTest", func(e Event) error {
@@ -112,11 +136,11 @@ func (s *EventScheduler) runLifecyclePhase(phase string, fn func(Event) error) e
 }
 
 // runKeepAliveLoop runs the keep-alive ticker, fires scheduled events at their times,
-// and listens for SIGINT/SIGTERM. Returns true if aborted by signal.
+// and listens for SIGINT/SIGTERM. Returns the reason the loop stopped.
 //
 // The loop stops early when ALL events with continueOnKeepAliveParticipant=true
 // have signaled done (consensus-based stop, matching the Java event-scheduler behavior).
-func (s *EventScheduler) runKeepAliveLoop() bool {
+func (s *EventScheduler) runKeepAliveLoop() stopReason {
 	keepAliveInterval := time.Duration(s.KeepAliveIntervalSec) * time.Second
 	if keepAliveInterval <= 0 {
 		keepAliveInterval = 30 * time.Second
@@ -158,15 +182,20 @@ func (s *EventScheduler) runKeepAliveLoop() bool {
 		select {
 		case <-testTimeout:
 			logger.Info("test duration reached")
-			return false
+			return stopNormal
 
 		case <-sigChan:
 			logger.Info("signal received, aborting")
-			return true
+			return stopSignal
 
 		case <-keepAliveTicker.C:
 			if err := s.sendTestEvent(false); err != nil {
 				logger.Warn("keep-alive failed", "err", err)
+			}
+
+			if status, err := s.Client.GetTestRunStatus(s.testRunID); err == nil && status.Abort {
+				logger.Info("test run aborted from UI")
+				return stopUIAbort
 			}
 
 			for _, event := range s.Events {
@@ -182,7 +211,7 @@ func (s *EventScheduler) runKeepAliveLoop() bool {
 
 			if keepAliveParticipantCount > 0 && len(keepAliveParticipantsDone) >= keepAliveParticipantCount {
 				logger.Info("all participants done, stopping")
-				return false
+				return stopNormal
 			}
 		}
 	}
@@ -244,14 +273,138 @@ func (s *EventScheduler) runAbort() {
 	}
 }
 
-// checkPerfanaResults calls the Perfana API to check test run results.
-func (s *EventScheduler) checkPerfanaResults() {
-	result, err := s.Client.GetTestRunStatus(s.testRunID)
-	if err != nil {
-		logger.Warn("failed to check results", "err", err)
-		return
+// checkPerfanaResults polls the Perfana API until the test run is completed,
+// retrying every 15 seconds for up to 5 minutes. Returns an error if the
+// test results indicate failure, so the CI job exits non-zero.
+func (s *EventScheduler) checkPerfanaResults() error {
+	const (
+		pollInterval = 15 * time.Second
+		pollTimeout  = 5 * time.Minute
+	)
+
+	deadline := time.Now().Add(pollTimeout)
+	for {
+		result, err := s.Client.GetTestRunStatus(s.testRunID)
+		if err != nil {
+			logger.Warn("failed to check results", "err", err)
+			return nil
+		}
+
+		if result.Completed {
+			s.logTestRunResult(result)
+			slosPassed := s.reportCheckResults(result)
+			adaptPassed := s.reportAdaptResults()
+			if !slosPassed || !adaptPassed {
+				return fmt.Errorf("test run failed: slos_passed=%v adapt_passed=%v", slosPassed, adaptPassed)
+			}
+			return nil
+		}
+
+		if time.Now().After(deadline) {
+			logger.Warn("timed out waiting for test run to complete", "test_run_id", s.testRunID)
+			return nil
+		}
+
+		logger.Info("test run not yet completed, retrying", "test_run_id", s.testRunID)
+		time.Sleep(pollInterval)
 	}
-	logger.Info("test run result", "result", result)
+}
+
+func (s *EventScheduler) logTestRunResult(result *perfana_client.TestRunResult) {
+	consolidated := "none"
+	if result.ConsolidatedResult != nil {
+		consolidated = *result.ConsolidatedResult
+	}
+	logger.Info("test run result",
+		"test_run_id", result.TestRunID,
+		"system", result.SystemsUnderTest.Name,
+		"environment", result.TestEnvironment,
+		"workload", result.Workload,
+		"release", result.ApplicationRelease,
+		"duration_s", result.Duration,
+		"valid", result.Valid,
+		"consolidated_result", consolidated,
+		"changepoint", result.IsChangepoint,
+	)
+}
+
+func (s *EventScheduler) reportCheckResults(result *perfana_client.TestRunResult) bool {
+	checks, err := s.Client.GetCheckResults(
+		s.testRunID,
+		result.SystemsUnderTest.Name,
+		result.TestEnvironment,
+		result.Workload,
+	)
+	if err != nil {
+		logger.Warn("failed to get check results", "err", err)
+		return true // don't fail CI on fetch error
+	}
+
+	pass, fail := 0, 0
+	for _, c := range checks {
+		if c.MeetsRequirement {
+			pass++
+		} else {
+			fail++
+		}
+	}
+	logger.Info("check results summary", "total", len(checks), "pass", pass, "fail", fail)
+
+	for _, c := range checks {
+		status := "PASS"
+		if !c.MeetsRequirement {
+			status = "FAIL"
+		}
+		logger.Info("check",
+			"status", status,
+			"dashboard", c.DashboardLabel,
+			"panel", c.PanelTitle,
+			"average", c.PanelAverage,
+			"requirement", fmt.Sprintf("%s %.4g %s", c.Requirement.Operator, c.Requirement.Value, c.MetricUnit),
+			"message", c.Message,
+		)
+	}
+
+	return fail == 0
+}
+
+func (s *EventScheduler) reportAdaptResults() bool {
+	adapt, err := s.Client.GetAdaptConclusion(s.testRunID)
+	if err != nil {
+		logger.Warn("failed to get adapt conclusion", "err", err)
+		return true // don't fail CI on fetch error
+	}
+
+	logger.Info("adapt conclusion",
+		"conclusion", adapt.Conclusion,
+		"regressions", len(adapt.Regressions),
+		"improvements", len(adapt.Improvements),
+		"differences", len(adapt.Differences),
+	)
+
+	for _, r := range adapt.Regressions {
+		logger.Info("regression",
+			"metric", r.MetricName,
+			"dashboard", r.Dashboard,
+			"panel", r.Panel,
+			"current", fmt.Sprintf("%.4g %s", r.Current, r.Unit),
+			"baseline", fmt.Sprintf("%.4g %s", r.Baseline, r.Unit),
+			"change_pct", fmt.Sprintf("%+.1f%%", r.ChangePct),
+		)
+	}
+
+	for _, i := range adapt.Improvements {
+		logger.Info("improvement",
+			"metric", i.MetricName,
+			"dashboard", i.Dashboard,
+			"panel", i.Panel,
+			"current", fmt.Sprintf("%.4g %s", i.Current, i.Unit),
+			"baseline", fmt.Sprintf("%.4g %s", i.Baseline, i.Unit),
+			"change_pct", fmt.Sprintf("%+.1f%%", i.ChangePct),
+		)
+	}
+
+	return adapt.Conclusion != "REGRESSION"
 }
 
 // sendTestEvent sends a keep-alive or completion event to Perfana.

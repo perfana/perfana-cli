@@ -55,6 +55,81 @@ type DeepLink struct {
 	PluginName string `json:"pluginName"`
 }
 
+// TestRunResult represents the response from the test run status API.
+type TestRunResult struct {
+	ID                   string   `json:"id"`
+	TestRunID            string   `json:"test_run_id"`
+	TestEnvironment      string   `json:"testEnvironment"`
+	Workload             string   `json:"workload"`
+	StartTime            string   `json:"start_time"`
+	EndTime              string   `json:"end_time"`
+	Duration             int      `json:"duration"`
+	PlannedDuration      int      `json:"planned_duration"`
+	AnalysisStartOffset  int      `json:"analysis_start_offset"`
+	Completed            bool     `json:"completed"`
+	Abort                bool     `json:"abort"`
+	Valid                bool     `json:"valid"`
+	CompletionPercentage int      `json:"completion_percentage"`
+	Status               *string  `json:"status"`
+	ConsolidatedResult   *string  `json:"consolidated_result"`
+	ApplicationRelease   string   `json:"application_release"`
+	Tags                 []string `json:"tags"`
+	Annotations          []string `json:"annotations"`
+	IsChangepoint        bool     `json:"is_changepoint"`
+	SystemsUnderTest     struct {
+		Name string `json:"name"`
+	} `json:"systems_under_test"`
+}
+
+// CheckRequirement holds the operator and threshold for a check.
+type CheckRequirement struct {
+	Operator string  `json:"operator"`
+	Value    float64 `json:"value"`
+}
+
+// CheckTarget holds per-target result data.
+type CheckTarget struct {
+	Target          string  `json:"target"`
+	Value           float64 `json:"value"`
+	MeetsRequirement bool   `json:"meets_requirement"`
+}
+
+// CheckResult represents a single SLO check result.
+type CheckResult struct {
+	DashboardLabel   string           `json:"dashboard_label"`
+	PanelTitle       string           `json:"panel_title"`
+	MetricUnit       string           `json:"metric_unit"`
+	Message          string           `json:"message"`
+	MeetsRequirement bool             `json:"meets_requirement"`
+	PanelAverage     string           `json:"panel_average"`
+	Requirement      CheckRequirement `json:"requirement"`
+	Targets          []CheckTarget    `json:"targets"`
+}
+
+// AdaptMetric holds a single regression/improvement/difference entry.
+type AdaptMetric struct {
+	MetricName     string  `json:"metric_name"`
+	Dashboard      string  `json:"dashboard"`
+	Panel          string  `json:"panel"`
+	Unit           string  `json:"unit"`
+	Current        float64 `json:"current"`
+	Baseline       float64 `json:"baseline"`
+	ChangePct      float64 `json:"change_pct"`
+	AbsoluteChange float64 `json:"absolute_change"`
+	Conclusion     string  `json:"conclusion"`
+}
+
+// AdaptConclusion holds the enriched adapt conclusion for a test run.
+type AdaptConclusion struct {
+	TestRunID      string        `json:"test_run_id"`
+	Conclusion     string        `json:"conclusion"`
+	ControlGroupID string        `json:"control_group_id"`
+	UpdatedAt      string        `json:"updated_at"`
+	Regressions    []AdaptMetric `json:"regressions"`
+	Improvements   []AdaptMetric `json:"improvements"`
+	Differences    []AdaptMetric `json:"differences"`
+}
+
 // PerfanaClient is the client implementation for Perfana
 type PerfanaClient struct {
 	httpClient *http.Client
@@ -304,15 +379,55 @@ func (c *PerfanaClient) AbortTest(testRunID string, additionalData map[string]in
 }
 
 // GetTestRunStatus retrieves the status of a test run from the Perfana API.
-func (c *PerfanaClient) GetTestRunStatus(testRunID string) (string, error) {
+func (c *PerfanaClient) GetTestRunStatus(testRunID string) (*TestRunResult, error) {
 	url := fmt.Sprintf("%s/api/test-runs/%s", c.config.BaseUrl, testRunID)
 
 	resp, err := c.makeRequest("GET", url, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(resp), nil
+	var result TestRunResult
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse test run result: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetCheckResults retrieves SLO check results for a completed test run.
+func (c *PerfanaClient) GetCheckResults(testRunID, system, environment, workload string) ([]CheckResult, error) {
+	url := fmt.Sprintf("%s/api/test-runs/%s/check-results?system=%s&environment=%s&workload=%s",
+		c.config.BaseUrl, testRunID, system, environment, workload)
+
+	resp, err := c.makeRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []CheckResult
+	if err := json.Unmarshal(resp, &results); err != nil {
+		return nil, fmt.Errorf("failed to parse check results: %w", err)
+	}
+
+	return results, nil
+}
+
+// GetAdaptConclusion retrieves the enriched adapt conclusion for a completed test run.
+func (c *PerfanaClient) GetAdaptConclusion(testRunID string) (*AdaptConclusion, error) {
+	url := fmt.Sprintf("%s/api/adapt/conclusion/%s/enriched", c.config.BaseUrl, testRunID)
+
+	resp, err := c.makeRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result AdaptConclusion
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse adapt conclusion: %w", err)
+	}
+
+	return &result, nil
 }
 
 // ConfigKeyRequest represents a single key-value config upload.
