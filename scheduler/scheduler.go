@@ -293,7 +293,7 @@ func (s *EventScheduler) checkPerfanaResults() error {
 		if result.Completed {
 			s.logTestRunResult(result)
 			slosPassed := s.reportCheckResults(result)
-			adaptPassed := s.reportAdaptResults()
+			adaptPassed := s.reportAdaptResults(result)
 			if !slosPassed || !adaptPassed {
 				return fmt.Errorf("test run failed: slos_passed=%v adapt_passed=%v", slosPassed, adaptPassed)
 			}
@@ -348,63 +348,79 @@ func (s *EventScheduler) reportCheckResults(result *perfana_client.TestRunResult
 			fail++
 		}
 	}
-	logger.Info("check results summary", "total", len(checks), "pass", pass, "fail", fail)
 
+	fmt.Fprintf(os.Stdout, "\n── SLO Check Results ─────────────────────────────────────────\n")
+	fmt.Fprintf(os.Stdout, "   total=%-4d  pass=%-4d  fail=%d\n\n", len(checks), pass, fail)
 	for _, c := range checks {
 		status := "PASS"
 		if !c.MeetsRequirement {
 			status = "FAIL"
 		}
-		logger.Info("check",
-			"status", status,
-			"dashboard", c.DashboardLabel,
-			"panel", c.PanelTitle,
-			"average", c.PanelAverage,
-			"requirement", fmt.Sprintf("%s %.4g %s", c.Requirement.Operator, c.Requirement.Value, c.MetricUnit),
-			"message", c.Message,
+		fmt.Fprintf(os.Stdout, "   [%s]  %-55s  avg=%-12s  req: %s %.4g %s\n",
+			status,
+			truncate(c.DashboardLabel+" / "+c.PanelTitle, 55),
+			c.PanelAverage,
+			c.Requirement.Operator, c.Requirement.Value, c.MetricUnit,
 		)
 	}
+	fmt.Fprintln(os.Stdout)
 
 	return fail == 0
 }
 
-func (s *EventScheduler) reportAdaptResults() bool {
+func (s *EventScheduler) reportAdaptResults(result *perfana_client.TestRunResult) bool {
 	adapt, err := s.Client.GetAdaptConclusion(s.testRunID)
 	if err != nil {
 		logger.Warn("failed to get adapt conclusion", "err", err)
 		return true // don't fail CI on fetch error
 	}
+	if adapt == nil {
+		logger.Info("no adapt conclusion available", "test_run_id", s.testRunID)
+		return true
+	}
 
-	logger.Info("adapt conclusion",
-		"conclusion", adapt.Conclusion,
-		"regressions", len(adapt.Regressions),
-		"improvements", len(adapt.Improvements),
-		"differences", len(adapt.Differences),
+	isBaseline := result.AdaptConfig.Mode == "BASELINE"
+
+	fmt.Fprintf(os.Stdout, "── Adapt Results ─────────────────────────────────────────────\n")
+	fmt.Fprintf(os.Stdout, "   conclusion=%-12s  mode=%-10s  regressions=%-4d  improvements=%-4d  differences=%d\n\n",
+		adapt.Conclusion, result.AdaptConfig.Mode,
+		len(adapt.Regressions), len(adapt.Improvements), len(adapt.Differences),
 	)
 
-	for _, r := range adapt.Regressions {
-		logger.Info("regression",
-			"metric", r.MetricName,
-			"dashboard", r.Dashboard,
-			"panel", r.Panel,
-			"current", fmt.Sprintf("%.4g %s", r.Current, r.Unit),
-			"baseline", fmt.Sprintf("%.4g %s", r.Baseline, r.Unit),
-			"change_pct", fmt.Sprintf("%+.1f%%", r.ChangePct),
-		)
+	if isBaseline && len(adapt.Regressions) > 0 {
+		fmt.Fprintf(os.Stdout, "   %d regression(s) accepted as variability (baseline mode)\n", len(adapt.Regressions))
+	} else {
+		for _, r := range adapt.Regressions {
+			fmt.Fprintf(os.Stdout, "   [REGRESSION]  %-55s  %s vs %s  (%+.1f%%)\n",
+				truncate(r.Dashboard+" / "+r.Panel+" / "+r.MetricName, 55),
+				fmt.Sprintf("%.4g %s", r.Current, r.Unit),
+				fmt.Sprintf("%.4g %s", r.Baseline, r.Unit),
+				r.ChangePct,
+			)
+		}
 	}
 
 	for _, i := range adapt.Improvements {
-		logger.Info("improvement",
-			"metric", i.MetricName,
-			"dashboard", i.Dashboard,
-			"panel", i.Panel,
-			"current", fmt.Sprintf("%.4g %s", i.Current, i.Unit),
-			"baseline", fmt.Sprintf("%.4g %s", i.Baseline, i.Unit),
-			"change_pct", fmt.Sprintf("%+.1f%%", i.ChangePct),
+		fmt.Fprintf(os.Stdout, "   [IMPROVEMENT] %-55s  %s vs %s  (%+.1f%%)\n",
+			truncate(i.Dashboard+" / "+i.Panel+" / "+i.MetricName, 55),
+			fmt.Sprintf("%.4g %s", i.Current, i.Unit),
+			fmt.Sprintf("%.4g %s", i.Baseline, i.Unit),
+			i.ChangePct,
 		)
 	}
+	fmt.Fprintln(os.Stdout)
 
+	if isBaseline {
+		return true
+	}
 	return adapt.Conclusion != "REGRESSION"
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n-1] + "…"
 }
 
 // sendTestEvent sends a keep-alive or completion event to Perfana.

@@ -59,7 +59,7 @@ type DeepLink struct {
 type TestRunResult struct {
 	ID                   string   `json:"id"`
 	TestRunID            string   `json:"test_run_id"`
-	TestEnvironment      string   `json:"testEnvironment"`
+	TestEnvironment      string   `json:"test_environment"`
 	Workload             string   `json:"workload"`
 	StartTime            string   `json:"start_time"`
 	EndTime              string   `json:"end_time"`
@@ -76,6 +76,9 @@ type TestRunResult struct {
 	Tags                 []string `json:"tags"`
 	Annotations          []string `json:"annotations"`
 	IsChangepoint        bool     `json:"is_changepoint"`
+	AdaptConfig          struct {
+		Mode string `json:"mode"`
+	} `json:"adapt_config"`
 	SystemsUnderTest     struct {
 		Name string `json:"name"`
 	} `json:"systems_under_test"`
@@ -414,12 +417,17 @@ func (c *PerfanaClient) GetCheckResults(testRunID, system, environment, workload
 }
 
 // GetAdaptConclusion retrieves the enriched adapt conclusion for a completed test run.
+// Returns nil, nil when no conclusion exists yet.
 func (c *PerfanaClient) GetAdaptConclusion(testRunID string) (*AdaptConclusion, error) {
 	url := fmt.Sprintf("%s/api/adapt/conclusion/%s/enriched", c.config.BaseUrl, testRunID)
 
 	resp, err := c.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(bytes.TrimSpace(resp)) == 0 {
+		return nil, nil
 	}
 
 	var result AdaptConclusion
