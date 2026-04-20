@@ -22,7 +22,7 @@ This guide helps you migrate from the Perfana Maven plugins (`perfana-java-clien
 | `systemUnderTest` property | `test.systemUnderTest` in YAML |
 | `testEnvironment` property | `test.environment` in YAML |
 | Event plugins (Java classes) | `events[].type: command` (shell commands) |
-| `perfanaUrl` | `perfana.baseUrl` |
+| `perfanaUrl` | `perfana.apiUrl` |
 | `apiKey` | `perfana.apiKey` |
 
 ## Step-by-step migration
@@ -37,7 +37,7 @@ brew install perfana/tap/perfana-cli
 
 ```bash
 perfana-cli init \
-  --baseUrl https://your-perfana-url \
+  --apiUrl https://your-perfana-url \
   --apiKey "$PERFANA_API_KEY" \
   --systemUnderTest "YourApp" \
   --environment "loadtest" \

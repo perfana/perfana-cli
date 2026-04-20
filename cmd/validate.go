@@ -58,8 +58,8 @@ func runValidate(configPath string) error {
 	var errors []string
 
 	// Validate perfana section
-	if config.Perfana.BaseUrl == "" {
-		errors = append(errors, "perfana.baseUrl is required")
+	if config.Perfana.ApiUrl == "" {
+		errors = append(errors, "perfana.apiUrl is required")
 	}
 
 	// Validate test section

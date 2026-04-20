@@ -70,8 +70,15 @@ type TestRunResult struct {
 	Abort                bool     `json:"abort"`
 	Valid                bool     `json:"valid"`
 	CompletionPercentage int      `json:"completion_percentage"`
-	Status               *string  `json:"status"`
-	ConsolidatedResult   *string  `json:"consolidated_result"`
+	Status *struct {
+		LastUpdate      string `json:"lastUpdate"`
+		EvaluatingAdapt string `json:"evaluatingAdapt"`
+		EvaluatingChecks string `json:"evaluatingChecks"`
+	} `json:"status"`
+	ConsolidatedResult *struct {
+		Overall         bool `json:"overall"`
+		MeetsRequirement bool `json:"meetsRequirement"`
+	} `json:"consolidated_result"`
 	ApplicationRelease   string   `json:"application_release"`
 	Tags                 []string `json:"tags"`
 	Annotations          []string `json:"annotations"`
@@ -141,8 +148,8 @@ type PerfanaClient struct {
 
 // NewClient initializes and returns a Perfana client
 func NewClient(config Configuration) (*PerfanaClient, error) {
-	if config.BaseUrl == "" {
-		return nil, errors.New("baseUrl is required")
+	if config.ApiUrl == "" {
+		return nil, errors.New("apiUrl is required")
 	}
 
 	if !config.MTLS.Enabled {
@@ -196,7 +203,7 @@ func createTLSClient(config Configuration) (*http.Client, error) {
 // It sends systemUnderTest, environment, and workload in the JSON payload
 // and receives a testRunId in the response.
 func (c *PerfanaClient) Init() (string, error) {
-	url := fmt.Sprintf("%s/api/init", c.config.BaseUrl)
+	url := fmt.Sprintf("%s/api/init", c.config.ApiUrl)
 
 	// Prepare the request body
 	reqBody, err := json.Marshal(map[string]string{
@@ -231,7 +238,7 @@ func (c *PerfanaClient) Init() (string, error) {
 
 // TestEvent makes a POST request to start a Perfana session
 func (c *PerfanaClient) TestEvent(testRunID string, additionalData map[string]interface{}, completed bool) error {
-	url := fmt.Sprintf("%s/api/test", c.config.BaseUrl)
+	url := fmt.Sprintf("%s/api/test", c.config.ApiUrl)
 
 	// Create the JSON payload (PerfanaMessage with additional fields as needed)
 	message := PerfanaMessage{
@@ -354,7 +361,7 @@ func (c *PerfanaClient) makeRequest(method, url string, body io.Reader) ([]byte,
 
 // AbortTest sends an abort signal to the Perfana API for the given test run.
 func (c *PerfanaClient) AbortTest(testRunID string, additionalData map[string]interface{}) error {
-	url := fmt.Sprintf("%s/api/test", c.config.BaseUrl)
+	url := fmt.Sprintf("%s/api/test", c.config.ApiUrl)
 
 	message := PerfanaMessage{
 		TestRunID:       testRunID,
@@ -383,7 +390,7 @@ func (c *PerfanaClient) AbortTest(testRunID string, additionalData map[string]in
 
 // GetTestRunStatus retrieves the status of a test run from the Perfana API.
 func (c *PerfanaClient) GetTestRunStatus(testRunID string) (*TestRunResult, error) {
-	url := fmt.Sprintf("%s/api/test-runs/%s", c.config.BaseUrl, testRunID)
+	url := fmt.Sprintf("%s/api/test-runs/%s", c.config.ApiUrl, testRunID)
 
 	resp, err := c.makeRequest("GET", url, nil)
 	if err != nil {
@@ -401,7 +408,7 @@ func (c *PerfanaClient) GetTestRunStatus(testRunID string) (*TestRunResult, erro
 // GetCheckResults retrieves SLO check results for a completed test run.
 func (c *PerfanaClient) GetCheckResults(testRunID, system, environment, workload string) ([]CheckResult, error) {
 	url := fmt.Sprintf("%s/api/test-runs/%s/check-results?system=%s&environment=%s&workload=%s",
-		c.config.BaseUrl, testRunID, system, environment, workload)
+		c.config.ApiUrl, testRunID, system, environment, workload)
 
 	resp, err := c.makeRequest("GET", url, nil)
 	if err != nil {
@@ -419,7 +426,7 @@ func (c *PerfanaClient) GetCheckResults(testRunID, system, environment, workload
 // GetAdaptConclusion retrieves the enriched adapt conclusion for a completed test run.
 // Returns nil, nil when no conclusion exists yet.
 func (c *PerfanaClient) GetAdaptConclusion(testRunID string) (*AdaptConclusion, error) {
-	url := fmt.Sprintf("%s/api/adapt/conclusion/%s/enriched", c.config.BaseUrl, testRunID)
+	url := fmt.Sprintf("%s/api/adapt/conclusion/%s/enriched", c.config.ApiUrl, testRunID)
 
 	resp, err := c.makeRequest("GET", url, nil)
 	if err != nil {
@@ -436,6 +443,30 @@ func (c *PerfanaClient) GetAdaptConclusion(testRunID string) (*AdaptConclusion, 
 	}
 
 	return &result, nil
+}
+
+// GetDefaultOrganizationID returns the ID of the first organization available to the API key.
+func (c *PerfanaClient) GetDefaultOrganizationID() (string, error) {
+	url := fmt.Sprintf("%s/api/organizations", c.config.ApiUrl)
+	resp, err := c.makeRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	var orgs []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(resp, &orgs); err != nil {
+		return "", fmt.Errorf("failed to parse organizations: %w", err)
+	}
+	if len(orgs) == 0 {
+		return "", nil
+	}
+	return orgs[0].ID, nil
+}
+
+// AppUrl returns the configured UI application URL.
+func (c *PerfanaClient) AppUrl() string {
+	return c.config.AppUrl
 }
 
 // ConfigKeyRequest represents a single key-value config upload.
@@ -479,7 +510,7 @@ type ConfigJSONRequest struct {
 
 // SendConfigKey uploads a single key-value config to Perfana.
 func (c *PerfanaClient) SendConfigKey(testRunID, systemUnderTest, testEnvironment, workload, key, value string, tags []string) error {
-	url := fmt.Sprintf("%s/api/config/key", c.config.BaseUrl)
+	url := fmt.Sprintf("%s/api/config/key", c.config.ApiUrl)
 
 	reqBody, err := json.Marshal(ConfigKeyRequest{
 		TestRunID:       testRunID,
@@ -500,7 +531,7 @@ func (c *PerfanaClient) SendConfigKey(testRunID, systemUnderTest, testEnvironmen
 
 // SendConfigKeys uploads multiple key-value configs to Perfana.
 func (c *PerfanaClient) SendConfigKeys(testRunID, systemUnderTest, testEnvironment, workload string, items []ConfigItem, tags []string) error {
-	url := fmt.Sprintf("%s/api/config/keys", c.config.BaseUrl)
+	url := fmt.Sprintf("%s/api/config/keys", c.config.ApiUrl)
 
 	reqBody, err := json.Marshal(ConfigKeysRequest{
 		TestRunID:       testRunID,
@@ -520,7 +551,7 @@ func (c *PerfanaClient) SendConfigKeys(testRunID, systemUnderTest, testEnvironme
 
 // SendConfigJSON uploads JSON config with regex filters to Perfana.
 func (c *PerfanaClient) SendConfigJSON(testRunID, systemUnderTest, testEnvironment, workload string, jsonData interface{}, includes, excludes, tags []string) error {
-	url := fmt.Sprintf("%s/api/config/json", c.config.BaseUrl)
+	url := fmt.Sprintf("%s/api/config/json", c.config.ApiUrl)
 
 	reqBody, err := json.Marshal(ConfigJSONRequest{
 		TestRunID:       testRunID,
@@ -544,7 +575,7 @@ func (c *PerfanaClient) SendConfigJSON(testRunID, systemUnderTest, testEnvironme
 // It returns an error if the request fails or if the response status is non-200,
 // along with the server response for non-200 statuses.
 func (c *PerfanaClient) SendPerfanaEvent(event PerfanaEvent) (string, error) {
-	url := fmt.Sprintf("%s/api/events", c.config.BaseUrl)
+	url := fmt.Sprintf("%s/api/events", c.config.ApiUrl)
 
 	// Marshal the event struct into JSON
 	reqBody, err := json.Marshal(event)

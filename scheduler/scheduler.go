@@ -294,6 +294,7 @@ func (s *EventScheduler) checkPerfanaResults() error {
 			s.logTestRunResult(result)
 			slosPassed := s.reportCheckResults(result)
 			adaptPassed := s.reportAdaptResults(result)
+			s.printDeepLink(result)
 			if !slosPassed || !adaptPassed {
 				return fmt.Errorf("test run failed: slos_passed=%v adapt_passed=%v", slosPassed, adaptPassed)
 			}
@@ -313,7 +314,11 @@ func (s *EventScheduler) checkPerfanaResults() error {
 func (s *EventScheduler) logTestRunResult(result *perfana_client.TestRunResult) {
 	consolidated := "none"
 	if result.ConsolidatedResult != nil {
-		consolidated = *result.ConsolidatedResult
+		if result.ConsolidatedResult.Overall {
+			consolidated = "PASS"
+		} else {
+			consolidated = "FAIL"
+		}
 	}
 	logger.Info("test run result",
 		"test_run_id", result.TestRunID,
@@ -421,6 +426,27 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n-1] + "…"
+}
+
+func (s *EventScheduler) printDeepLink(result *perfana_client.TestRunResult) {
+	appUrl := s.Client.AppUrl()
+	if appUrl == "" {
+		return
+	}
+	orgID, err := s.Client.GetDefaultOrganizationID()
+	if err != nil {
+		logger.Warn("failed to fetch organization ID for deep link", "err", err)
+		return
+	}
+	link := fmt.Sprintf("%s/test-runs/%s?system=%s&environment=%s&workload=%s",
+		appUrl, s.testRunID,
+		result.SystemsUnderTest.Name, result.TestEnvironment, result.Workload,
+	)
+	if orgID != "" {
+		link += "&organizationId=" + orgID
+	}
+	fmt.Fprintf(os.Stdout, "── Perfana ───────────────────────────────────────────────────\n")
+	fmt.Fprintf(os.Stdout, "   %s\n\n", link)
 }
 
 // sendTestEvent sends a keep-alive or completion event to Perfana.

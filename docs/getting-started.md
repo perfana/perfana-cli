@@ -50,7 +50,7 @@ Run the init command to create `~/.perfana-cli/perfana.yaml`:
 
 ```bash
 perfana-cli init \
-  --baseUrl https://your-perfana.example.com \
+  --apiUrl https://your-perfana.example.com \
   --apiKey "$PERFANA_API_KEY" \
   --systemUnderTest "MyApp" \
   --environment "loadtest" \
@@ -61,7 +61,7 @@ For Perfana Cloud with mTLS:
 
 ```bash
 perfana-cli init \
-  --baseUrl https://acme.perfana.cloud \
+  --apiUrl https://acme.perfana.cloud \
   --clientIdentifier acme \
   --clientCertPath /path/to/tls.crt \
   --clientKeyPath /path/to/tls.key \

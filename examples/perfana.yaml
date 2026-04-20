@@ -3,7 +3,8 @@
 
 perfana:
   apiKey: "${PERFANA_API_KEY}"
-  baseUrl: "https://perfana.example.com"
+  apiUrl: "https://perfana.example.com"
+  appUrl: "https://perfana.example.com"
   # Optional mTLS configuration
   # mtls:
   #   clientKeyPath: "/path/to/key.pem"

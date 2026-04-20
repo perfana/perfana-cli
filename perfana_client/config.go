@@ -3,7 +3,8 @@ package perfana_client
 // Configuration struct to represent the YAML structure
 type Configuration struct {
 	ApiKey           string `yaml:"apiKey"`
-	BaseUrl          string `yaml:"baseUrl"`
+	ApiUrl           string `yaml:"apiUrl"`
+	AppUrl           string `yaml:"appUrl"`
 	ClientIdentifier string `yaml:"clientIdentifier"`
 	SystemUnderTest  string `yaml:"systemUnderTest"`
 	Environment      string `yaml:"environment"`

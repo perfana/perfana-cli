@@ -130,8 +130,8 @@ type MigratedConfig struct {
 }
 
 type MigratedPerfana struct {
-	ApiKey  string `yaml:"apiKey"`
-	BaseUrl string `yaml:"baseUrl"`
+	ApiKey string `yaml:"apiKey"`
+	ApiUrl string `yaml:"apiUrl"`
 }
 
 type MigratedTest struct {
@@ -402,8 +402,8 @@ func migratePom(pomPath string) (*MigratedConfig, []string, map[string]string, e
 
 	migrated := &MigratedConfig{
 		Perfana: MigratedPerfana{
-			ApiKey:  convertApiKey(apiKey),
-			BaseUrl: baseUrl,
+			ApiKey: convertApiKey(apiKey),
+			ApiUrl: baseUrl,
 		},
 		Test: MigratedTest{
 			SystemUnderTest:     resolve(esc.TestConfig.SystemUnderTest),

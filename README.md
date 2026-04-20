@@ -28,7 +28,7 @@ Initialize a configuration file at `~/.perfana-cli/perfana.yaml`:
 
 ```bash
 perfana-cli init \
-  --baseUrl https://acme.perfana.cloud \
+  --apiUrl https://acme.perfana.cloud \
   --clientIdentifier acme \
   --apiKey "$PERFANA_API_KEY" \
   --systemUnderTest my-service \
@@ -67,7 +67,8 @@ Configuration is a YAML file (default: `~/.perfana-cli/perfana.yaml`, override w
 ```yaml
 perfana:
   apiKey: "${PERFANA_API_KEY}"
-  baseUrl: https://acme.perfana.cloud
+  apiUrl: https://acme.perfana.cloud
+  appUrl: https://acme.perfana.cloud
   clientIdentifier: acme
   mtls:
     enabled: true
@@ -144,7 +145,8 @@ Commit a `perfana.yaml` to your repository and reference it with the `config` in
 # perfana.yaml
 perfana:
   apiKey: "${PERFANA_API_KEY}"
-  baseUrl: https://acme.perfana.cloud
+  apiUrl: https://acme.perfana.cloud
+  appUrl: https://acme.perfana.cloud
 
 test:
   systemUnderTest: my-service

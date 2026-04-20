@@ -7,7 +7,8 @@ The `perfana-cli` reads configuration from a YAML file. By default it looks for 
 ```yaml
 perfana:
   apiKey: "${PERFANA_API_KEY}"
-  baseUrl: "https://perfana.example.com"
+  apiUrl: "https://perfana.example.com"
+  appUrl: "https://perfana.example.com"
   mtls:
     clientKeyPath: "/path/to/key.pem"
     clientCertPath: "/path/to/cert.pem"
@@ -64,7 +65,8 @@ events:
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `apiKey` | Yes | | Perfana API key. Supports env var substitution: `${PERFANA_API_KEY}` |
-| `baseUrl` | Yes | `http://localhost:4000` | Perfana API base URL |
+| `apiUrl` | Yes | | Perfana API base URL (e.g. `http://localhost:3001`) |
+| `appUrl` | No | | Perfana UI URL — when set, a direct link to the test run is printed at the end (e.g. `http://localhost:4000`) |
 | `mtls.clientKeyPath` | No | | Path to PEM-encoded private key for mTLS |
 | `mtls.clientCertPath` | No | | Path to PEM-encoded certificate for mTLS |
 

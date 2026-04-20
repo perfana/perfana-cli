@@ -52,7 +52,7 @@ var initCmd = &cobra.Command{
 		// Initialize default configuration
 		config := perfana_client.Configuration{
 			ApiKey:           "your-api-key",
-			BaseUrl:          "http://localhost:4000",
+			ApiUrl:          "http://localhost:4000",
 			ClientIdentifier: "your-client-identifier",
 			SystemUnderTest:  "your-system-under-test",
 			Environment:      "your-environment",
@@ -63,7 +63,7 @@ var initCmd = &cobra.Command{
 
 		// Read flags
 		clientIdentifier, _ := cmd.Flags().GetString("clientIdentifier")
-		baseUrl, _ := cmd.Flags().GetString("baseUrl")
+		apiUrl, _ := cmd.Flags().GetString("apiUrl")
 		systemUnderTest, _ := cmd.Flags().GetString("systemUnderTest")
 		environment, _ := cmd.Flags().GetString("environment")
 		workload, _ := cmd.Flags().GetString("workload")
@@ -75,8 +75,8 @@ var initCmd = &cobra.Command{
 		if clientIdentifier != "" {
 			config.ClientIdentifier = clientIdentifier
 		}
-		if baseUrl != "" {
-			config.BaseUrl = baseUrl
+		if apiUrl != "" {
+			config.ApiUrl = apiUrl
 		}
 		if systemUnderTest != "" {
 			config.SystemUnderTest = systemUnderTest
@@ -140,7 +140,7 @@ func init() {
 
 	// Add flags for optional customization
 	initCmd.Flags().String("clientIdentifier", "", "Client identifier for Perfana configuration")
-	initCmd.Flags().String("baseUrl", "", "Base URL to use for calling Perfana, e.g. http://localhost:4000")
+	initCmd.Flags().String("apiUrl", "", "Base URL to use for calling Perfana, e.g. http://localhost:4000")
 	initCmd.Flags().String("apiKey", "", "Perfana API key")
 	initCmd.Flags().String("systemUnderTest", "", "System under test for Perfana configuration")
 	initCmd.Flags().String("environment", "", "Environment for Perfana configuration")
@@ -174,7 +174,7 @@ var initProjectCmd = &cobra.Command{
 # Perfana server connection
 perfana:
   apiKey: "${PERFANA_API_KEY}"          # Set via environment variable
-  baseUrl: "https://perfana.example.com"
+  apiUrl: "https://perfana.example.com"
   # mtls:                               # Optional mutual TLS
   #   clientKeyPath: "/path/to/key.pem"
   #   clientCertPath: "/path/to/cert.pem"

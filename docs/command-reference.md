@@ -18,7 +18,7 @@ perfana-cli init [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--baseUrl` | `http://localhost:4000` | Perfana API base URL |
+| `--apiUrl` | | Perfana API base URL (e.g. `http://localhost:3001`) |
 | `--apiKey` | | Perfana API key |
 | `--clientIdentifier` | | Client identifier (for Perfana Cloud) |
 | `--systemUnderTest` | | System under test name |
@@ -31,7 +31,7 @@ perfana-cli init [flags]
 
 ```bash
 perfana-cli init \
-  --baseUrl https://acme.perfana.cloud \
+  --apiUrl https://acme.perfana.cloud \
   --apiKey "$PERFANA_API_KEY" \
   --systemUnderTest "WebShop" \
   --environment "acceptance" \
