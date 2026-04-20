@@ -291,6 +291,12 @@ func (s *EventScheduler) checkPerfanaResults() error {
 		}
 
 		if result.Completed {
+			// Wait for Perfana analysis to finish before fetching results.
+			result, err = s.waitForAnalysis(deadline)
+			if err != nil {
+				logger.Warn("timed out waiting for analysis", "err", err)
+				// Still print what we have.
+			}
 			s.logTestRunResult(result)
 			slosPassed := s.reportCheckResults(result)
 			adaptPassed := s.reportAdaptResults(result)
@@ -307,6 +313,36 @@ func (s *EventScheduler) checkPerfanaResults() error {
 		}
 
 		logger.Info("test run not yet completed, retrying", "test_run_id", s.testRunID)
+		time.Sleep(pollInterval)
+	}
+}
+
+// waitForAnalysis polls until neither evaluatingAdapt nor evaluatingChecks is
+// IN_PROGRESS (missing fields are treated as not in progress), or the deadline is reached.
+func (s *EventScheduler) waitForAnalysis(deadline time.Time) (*perfana_client.TestRunResult, error) {
+	const pollInterval = 10 * time.Second
+	for {
+		result, err := s.Client.GetTestRunStatus(s.testRunID)
+		if err != nil {
+			return nil, err
+		}
+		if result.Status == nil {
+			return result, nil
+		}
+		adaptDone := result.Status.EvaluatingAdapt != "IN_PROGRESS"
+		checksDone := result.Status.EvaluatingChecks != "IN_PROGRESS"
+		if adaptDone && checksDone {
+			return result, nil
+		}
+		if time.Now().After(deadline) {
+			return result, fmt.Errorf("analysis still in progress after timeout")
+		}
+		if !adaptDone {
+			logger.Info("adapt analysis in progress, waiting", "evaluatingAdapt", result.Status.EvaluatingAdapt)
+		}
+		if !checksDone {
+			logger.Info("checks analysis in progress, waiting", "evaluatingChecks", result.Status.EvaluatingChecks)
+		}
 		time.Sleep(pollInterval)
 	}
 }
