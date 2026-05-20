@@ -359,6 +359,40 @@ func (c *PerfanaClient) makeRequest(method, url string, body io.Reader) ([]byte,
 	return respBody, nil
 }
 
+// makeRequestAllowNotFound is like makeRequest but returns nil, nil for 404 responses.
+func (c *PerfanaClient) makeRequestAllowNotFound(method, url string, body io.Reader) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.ApiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("HTTP error: %s (%d): %s", resp.Status, resp.StatusCode, string(body))
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return respBody, nil
+}
+
 // AbortTest sends an abort signal to the Perfana API for the given test run.
 func (c *PerfanaClient) AbortTest(testRunID string, additionalData map[string]interface{}) error {
 	url := fmt.Sprintf("%s/api/test", c.config.ApiUrl)
@@ -424,11 +458,11 @@ func (c *PerfanaClient) GetCheckResults(testRunID, system, environment, workload
 }
 
 // GetAdaptConclusion retrieves the enriched adapt conclusion for a completed test run.
-// Returns nil, nil when no conclusion exists yet.
+// Returns nil, nil when no conclusion exists (404 = first run, no baselines, etc.).
 func (c *PerfanaClient) GetAdaptConclusion(testRunID string) (*AdaptConclusion, error) {
 	url := fmt.Sprintf("%s/api/adapt/conclusion/%s/enriched", c.config.ApiUrl, testRunID)
 
-	resp, err := c.makeRequest("GET", url, nil)
+	resp, err := c.makeRequestAllowNotFound("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}

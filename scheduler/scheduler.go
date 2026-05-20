@@ -329,7 +329,7 @@ func (s *EventScheduler) waitForAnalysis() (*perfana_client.TestRunResult, error
 		if err != nil {
 			return nil, err
 		}
-		if result.Status == nil {
+		if result.Status == nil || (result.Status.EvaluatingAdapt == "" && result.Status.EvaluatingChecks == "") {
 			logger.Info("waiting for analysis to start", "attempt", attempt+1, "max", maxAnalysisRetries)
 			time.Sleep(pollInterval)
 			continue
