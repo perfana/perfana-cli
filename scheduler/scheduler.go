@@ -320,8 +320,8 @@ func (s *EventScheduler) checkPerfanaResults() error {
 }
 
 // waitForAnalysis polls until neither evaluatingAdapt nor evaluatingChecks is
-// IN_PROGRESS (missing fields are treated as not in progress), retrying up to
-// maxAnalysisRetries times before giving up.
+// IN_PROGRESS, retrying up to maxAnalysisRetries times before giving up.
+// A nil status means analysis has not started yet; the loop keeps waiting.
 func (s *EventScheduler) waitForAnalysis() (*perfana_client.TestRunResult, error) {
 	const pollInterval = 10 * time.Second
 	for attempt := 0; attempt < maxAnalysisRetries; attempt++ {
@@ -330,7 +330,9 @@ func (s *EventScheduler) waitForAnalysis() (*perfana_client.TestRunResult, error
 			return nil, err
 		}
 		if result.Status == nil {
-			return result, nil
+			logger.Info("waiting for analysis to start", "attempt", attempt+1, "max", maxAnalysisRetries)
+			time.Sleep(pollInterval)
+			continue
 		}
 		adaptDone := result.Status.EvaluatingAdapt != "IN_PROGRESS"
 		checksDone := result.Status.EvaluatingChecks != "IN_PROGRESS"
