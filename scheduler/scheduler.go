@@ -276,12 +276,12 @@ func (s *EventScheduler) runAbort() {
 }
 
 // checkPerfanaResults polls the Perfana API until the test run is completed,
-// retrying every 15 seconds for up to 5 minutes. Returns an error if the
+// retrying every 15 seconds for up to 60 seconds. Returns an error if the
 // test results indicate failure, so the CI job exits non-zero.
 func (s *EventScheduler) checkPerfanaResults() error {
 	const (
 		pollInterval = 15 * time.Second
-		pollTimeout  = 5 * time.Minute
+		pollTimeout  = 60 * time.Second
 	)
 
 	deadline := time.Now().Add(pollTimeout)
