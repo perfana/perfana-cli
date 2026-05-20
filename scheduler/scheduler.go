@@ -20,6 +20,8 @@ const (
 	stopUIAbort             // abort flag set on test run via Perfana UI
 )
 
+const maxAnalysisRetries = 30 // 30 × 10 s = 5 min max
+
 // EventScheduler orchestrates the full test lifecycle:
 // BeforeTest → StartTest → KeepAlive loop (+ scheduled events) → CheckResults → AfterTest
 type EventScheduler struct {
@@ -292,7 +294,7 @@ func (s *EventScheduler) checkPerfanaResults() error {
 
 		if result.Completed {
 			// Wait for Perfana analysis to finish before fetching results.
-			result, err = s.waitForAnalysis(deadline)
+			result, err = s.waitForAnalysis()
 			if err != nil {
 				logger.Warn("timed out waiting for analysis", "err", err)
 				// Still print what we have.
@@ -318,10 +320,11 @@ func (s *EventScheduler) checkPerfanaResults() error {
 }
 
 // waitForAnalysis polls until neither evaluatingAdapt nor evaluatingChecks is
-// IN_PROGRESS (missing fields are treated as not in progress), or the deadline is reached.
-func (s *EventScheduler) waitForAnalysis(deadline time.Time) (*perfana_client.TestRunResult, error) {
+// IN_PROGRESS (missing fields are treated as not in progress), retrying up to
+// maxAnalysisRetries times before giving up.
+func (s *EventScheduler) waitForAnalysis() (*perfana_client.TestRunResult, error) {
 	const pollInterval = 10 * time.Second
-	for {
+	for attempt := 0; attempt < maxAnalysisRetries; attempt++ {
 		result, err := s.Client.GetTestRunStatus(s.testRunID)
 		if err != nil {
 			return nil, err
@@ -334,17 +337,23 @@ func (s *EventScheduler) waitForAnalysis(deadline time.Time) (*perfana_client.Te
 		if adaptDone && checksDone {
 			return result, nil
 		}
-		if time.Now().After(deadline) {
-			return result, fmt.Errorf("analysis still in progress after timeout")
+		if result.Status.EvaluatingAdapt == "FAILED" || result.Status.EvaluatingChecks == "FAILED" || result.Status.EvaluatingChecks == "ERROR" {
+			logger.Warn("analysis reached terminal failure state, stopping wait", "evaluatingAdapt", result.Status.EvaluatingAdapt, "evaluatingChecks", result.Status.EvaluatingChecks)
+			return result, nil
 		}
 		if !adaptDone {
-			logger.Info("adapt analysis in progress, waiting", "evaluatingAdapt", result.Status.EvaluatingAdapt)
+			logger.Info("adapt analysis in progress, waiting", "evaluatingAdapt", result.Status.EvaluatingAdapt, "attempt", attempt+1, "max", maxAnalysisRetries)
 		}
 		if !checksDone {
-			logger.Info("checks analysis in progress, waiting", "evaluatingChecks", result.Status.EvaluatingChecks)
+			logger.Info("checks analysis in progress, waiting", "evaluatingChecks", result.Status.EvaluatingChecks, "attempt", attempt+1, "max", maxAnalysisRetries)
 		}
 		time.Sleep(pollInterval)
 	}
+	result, err := s.Client.GetTestRunStatus(s.testRunID)
+	if err != nil {
+		return nil, err
+	}
+	return result, fmt.Errorf("analysis still in progress after %d retries", maxAnalysisRetries)
 }
 
 func (s *EventScheduler) logTestRunResult(result *perfana_client.TestRunResult) {
