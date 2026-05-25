@@ -16,6 +16,7 @@ test:
   workload: "peak-hours"
   version: "1.0.0"
   analysisStartOffset: "PT2M"
+  analysisEndOffset: "PT1M"
   constantLoadTime: "PT15M"
   tags:
     - "nightly"

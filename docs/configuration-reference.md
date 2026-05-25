@@ -19,6 +19,7 @@ test:
   workload: "peak-hours"
   version: "1.0.0"
   analysisStartOffset: "PT2M"
+  analysisEndOffset: "PT1M"
   constantLoadTime: "PT15M"
   tags:
     - "nightly"
@@ -79,6 +80,7 @@ events:
 | `workload` | Yes | | Workload name |
 | `version` | No | | Version of the system under test |
 | `analysisStartOffset` | No | `PT5M` | Offset before analysis starts (typically the ramp-up window, ISO 8601) |
+| `analysisEndOffset` | No | | Offset before analysis ends (trims the cool-down tail), ISO 8601 |
 | `constantLoadTime` | No | `PT15M` | Constant load duration (ISO 8601) |
 | `tags` | No | | List of tags for filtering and grouping |
 | `annotations` | No | | Free-text annotation for the test run |

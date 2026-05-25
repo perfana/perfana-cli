@@ -32,6 +32,7 @@ type PerfanaMessage struct {
 	Version             string     `json:"version,omitempty"`             // Optional
 	CIBuildResultsURL   string     `json:"CIBuildResultsUrl,omitempty"`   // Optional
 	AnalysisStartOffset int        `json:"analysisStartOffset,omitempty"` // Optional, seconds
+	AnalysisEndOffset   int        `json:"analysisEndOffset,omitempty"`   // Optional, seconds
 	Duration            int        `json:"duration,omitempty"`            // Optional, seconds
 	Completed           bool       `json:"completed"`
 	Abort               bool       `json:"abort,omitempty"`
@@ -262,6 +263,13 @@ func (c *PerfanaClient) TestEvent(testRunID string, additionalData map[string]in
 			return fmt.Errorf("invalid analysisStartOffset: %w", err)
 		}
 		message.AnalysisStartOffset = seconds
+	}
+	if analysisEndOffset, ok := additionalData["analysisEndOffset"]; ok {
+		seconds, err := normalizeDurationToSeconds(analysisEndOffset)
+		if err != nil {
+			return fmt.Errorf("invalid analysisEndOffset: %w", err)
+		}
+		message.AnalysisEndOffset = seconds
 	}
 	if duration, ok := additionalData["duration"]; ok {
 		seconds, err := normalizeDurationToSeconds(duration)

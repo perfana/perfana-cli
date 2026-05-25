@@ -51,6 +51,7 @@ perfana-cli run start [flags]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--analysisStartOffset` | `PT5M` | Offset before analysis starts (typically the ramp-up window), ISO 8601 format |
+| `--analysisEndOffset` | | Offset before analysis ends (trims the cool-down tail), ISO 8601 format |
 | `--constantLoadTime` | `PT15M` | Constant load duration in ISO 8601 format |
 | `--version` | `1.0.0` | Version of the system under test |
 | `--tags` | `k6,jfr` | Comma-separated tags for the test session |
