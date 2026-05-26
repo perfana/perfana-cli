@@ -45,6 +45,7 @@ type TestConfig struct {
 	Workload            string                    `yaml:"workload"`
 	Version             string                    `yaml:"version"`
 	AnalysisStartOffset string                    `yaml:"analysisStartOffset"`
+	AnalysisEndOffset   string                    `yaml:"analysisEndOffset"`
 	ConstantLoadTime    string                    `yaml:"constantLoadTime"`
 	Tags                []string                  `yaml:"tags"`
 	Annotations         string                    `yaml:"annotations"`
@@ -188,6 +189,15 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			return
 		}
 
+		analysisEndOffsetSec := 0
+		if fullConfig.Test.AnalysisEndOffset != "" {
+			analysisEndOffsetSec, err = util.ParseISODurationToSeconds(fullConfig.Test.AnalysisEndOffset)
+			if err != nil {
+				fmt.Printf("Error parsing analysisEndOffset: %v\n", err)
+				return
+			}
+		}
+
 		constantLoadSec, err := util.ParseISODurationToSeconds(effectiveConstant)
 		if err != nil {
 			fmt.Printf("Error parsing constantLoadTime: %v\n", err)
@@ -234,6 +244,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			Variables:           variables,
 			Annotations:         effectiveAnnotation,
 			AnalysisStartOffset: analysisStartOffsetSec,
+			AnalysisEndOffset:   analysisEndOffsetSec,
 			Duration:            constantLoadSec,
 			BuildResultsUrl:     effectiveBuildResultsUrl,
 			DeepLinks:           fullConfig.Test.DeepLinks,

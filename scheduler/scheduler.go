@@ -515,6 +515,9 @@ func (s *EventScheduler) buildAdditionalData() map[string]interface{} {
 	if s.TestContext.AnalysisStartOffset > 0 {
 		data["analysisStartOffset"] = s.TestContext.AnalysisStartOffset
 	}
+	if s.TestContext.AnalysisEndOffset > 0 {
+		data["analysisEndOffset"] = s.TestContext.AnalysisEndOffset
+	}
 	if s.TestContext.Duration > 0 {
 		data["duration"] = s.TestContext.Duration
 	}
