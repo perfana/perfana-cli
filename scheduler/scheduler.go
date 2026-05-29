@@ -82,12 +82,27 @@ func (s *EventScheduler) Run() error {
 		return fmt.Errorf("test aborted by signal")
 
 	case stopUIAbort:
-		// 5b. UI abort: Perfana already owns the abort state; just clean up events.
+		// 5b. UI abort: Perfana already owns the abort state; notify events, then
+		// fetch analysis results the same way a completed run would.
 		s.runAbort()
+
+		if err := s.runLifecyclePhase("CheckResults", func(e Event) error {
+			return e.CheckResults(s.TestContext)
+		}); err != nil {
+			logger.Warn("check results error", "err", err)
+		}
+
+		if err := s.checkPerfanaResults(); err != nil {
+			_ = s.runLifecyclePhase("AfterTest", func(e Event) error {
+				return e.AfterTest(s.TestContext)
+			})
+			return err
+		}
+
 		_ = s.runLifecyclePhase("AfterTest", func(e Event) error {
 			return e.AfterTest(s.TestContext)
 		})
-		logger.Info("test aborted from UI, exiting gracefully")
+		logger.Info("test aborted from UI, analysis complete")
 		return nil
 	}
 
