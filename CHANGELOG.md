@@ -32,7 +32,7 @@
 
 ### Added
 
-- `run start` and `validate` accept `--overlay <file>`, a config file applied on top of `--config`. Its values win, and its events run after those from `--config`.
+- `run start` and `validate` accept `--overlay <file>`, a config file applied on top of `--config`. Its values win, except that `events` and `test.tags` are combined, with its events running after those from `--config`.
 - `run start --analysisEndOffset` sets the trailing period excluded from analysis and overrides `test.analysisEndOffset`.
 - A keep-alive participant is now done when its `onStartTest` command exits, so `onKeepAlive` is optional.
 

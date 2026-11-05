@@ -39,7 +39,7 @@ reports clear error messages.`,
 
 func init() {
 	rootCmd.AddCommand(validateCmd)
-	validateCmd.Flags().StringVar(&overlayFile, "overlay", "", "Config file applied on top of --config. Its values win and its events run last.")
+	validateCmd.Flags().StringVar(&overlayFile, "overlay", "", "Config file applied on top of --config. Its values win; events and test.tags are combined, with its events running last.")
 }
 
 func runValidate(configPath string) error {
