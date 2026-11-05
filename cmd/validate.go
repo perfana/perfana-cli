@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 	"perfana-cli/util"
 )
 
@@ -40,19 +39,13 @@ reports clear error messages.`,
 
 func init() {
 	rootCmd.AddCommand(validateCmd)
+	validateCmd.Flags().StringVar(&overlayFile, "overlay", "", "Config file applied on top of --config. Its values win and its events run last.")
 }
 
 func runValidate(configPath string) error {
-	file, err := os.ReadFile(configPath)
+	config, err := loadConfig(configPath, overlayFile)
 	if err != nil {
-		return fmt.Errorf("cannot read %s: %w", configPath, err)
-	}
-
-	expandedContent := os.ExpandEnv(string(file))
-
-	var config FullConfig
-	if err := yaml.Unmarshal([]byte(expandedContent), &config); err != nil {
-		return fmt.Errorf("YAML parse error: %w", err)
+		return err
 	}
 
 	var errors []string

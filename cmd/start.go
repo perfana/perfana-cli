@@ -85,8 +85,32 @@ type EventConfig struct {
 	Tags     []string `yaml:"tags"`
 }
 
+// loadConfig reads configPath and then overlayPath (optional) on top of it, with
+// env vars expanded. Values set in the overlay win, and its events run after
+// those from configPath.
+func loadConfig(configPath, overlayPath string) (FullConfig, error) {
+	var config FullConfig
+	for _, path := range []string{configPath, overlayPath} {
+		if path == "" {
+			continue
+		}
+		file, err := os.ReadFile(path)
+		if err != nil {
+			return config, fmt.Errorf("cannot read %s: %w", path, err)
+		}
+		events := config.Events
+		config.Events = nil
+		if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(file))), &config); err != nil {
+			return config, fmt.Errorf("YAML parse error in %s: %w", path, err)
+		}
+		config.Events = append(events, config.Events...)
+	}
+	return config, nil
+}
+
 // Define command-line flags with default values
 var (
+	overlayFile         string
 	analysisStartOffset string
 	analysisEndOffset   string
 	testDuration        string
@@ -124,19 +148,9 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			}
 		}
 
-		file, err := os.ReadFile(configPath)
+		fullConfig, err := loadConfig(configPath, overlayFile)
 		if err != nil {
-			fmt.Printf("Error reading configuration file: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Expand environment variables in YAML content
-		expandedContent := os.ExpandEnv(string(file))
-
-		// Parse the full YAML configuration
-		var fullConfig FullConfig
-		if err := yaml.Unmarshal([]byte(expandedContent), &fullConfig); err != nil {
-			fmt.Printf("Error parsing configuration file: %v\n", err)
+			fmt.Printf("Error loading configuration: %v\n", err)
 			os.Exit(1)
 		}
 		if !fullConfig.Test.ConstantLoadTime.IsZero() {
@@ -334,6 +348,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 func init() {
 	runCmd.AddCommand(startCmd)
 
+	startCmd.Flags().StringVar(&overlayFile, "overlay", "", "Config file applied on top of --config. Its values win and its events run last.")
 	startCmd.Flags().StringVar(&analysisStartOffset, "analysisStartOffset", "", "Offset before analysis starts (typically the ramp-up window) in ISO8601 format (e.g., PT5M). Overrides YAML.")
 	startCmd.Flags().StringVar(&analysisEndOffset, "analysisEndOffset", "", "Trailing period excluded from analysis (typically the ramp-down window) in ISO8601 format (e.g., PT1M). Overrides YAML.")
 	startCmd.Flags().StringVar(&testDuration, "duration", "", "Total test duration in ISO8601 format, including any analysis offsets (e.g., PT20M). Overrides YAML.")

@@ -71,8 +71,8 @@ func (e *ConfigCollectorEvent) BeforeTest(ctx scheduler.TestContext) error {
 
 	stdout := strings.TrimSpace(string(output))
 	if stdout == "" {
-		logger.Info("no config output, skipping upload", "event", e.name)
-		return nil
+		// A failed `curl | jq` exits 0 with no output, so treat this as a failure.
+		return fmt.Errorf("config collection command produced no output")
 	}
 
 	return e.uploadConfig(ctx, stdout)
@@ -105,7 +105,7 @@ func (e *ConfigCollectorEvent) uploadConfig(ctx scheduler.TestContext, stdout st
 	case "keys":
 		items := parseKeyValueLines(stdout)
 		if len(items) == 0 {
-			return nil
+			return fmt.Errorf("config collection command produced no key=value lines")
 		}
 		logger.Info("uploading config keys", "event", e.name, "count", len(items))
 		return client.SendConfigKeys(testRunID, systemUnderTest, environment, workload, items, e.tags)

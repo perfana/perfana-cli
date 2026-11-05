@@ -28,8 +28,11 @@
 
 - **`run start` exits non-zero on setup errors.** An unreadable or invalid config, an invalid duration, or a client setup failure used to print an error and exit 0.
 
+- **A `config-collector` command with no output is now an error.** It used to be skipped, which hid failures: a failed `curl | jq` exits 0 with no output. The same applies to `output: keys` with no `key=value` lines. With `scheduler.failOnError: true` this stops the test before it starts. To let a test run without a value, give the command a fallback, for example `cat version.txt || echo unknown`.
+
 ### Added
 
+- `run start` and `validate` accept `--overlay <file>`, a config file applied on top of `--config`. Its values win, and its events run after those from `--config`.
 - `run start --analysisEndOffset` sets the trailing period excluded from analysis and overrides `test.analysisEndOffset`.
 - A keep-alive participant is now done when its `onStartTest` command exits, so `onKeepAlive` is optional.
 

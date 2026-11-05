@@ -155,7 +155,7 @@ Runs shell commands at lifecycle hooks. Commands support `__testRunId__`, `__sys
 
 #### Type: `config-collector`
 
-Collects configuration data and sends it to Perfana.
+Collects configuration data before the test starts and sends it to Perfana. A command that fails or produces no output is an error, which stops the test when `scheduler.failOnError` is `true`. To let a test run without a value, give the command a fallback, for example `cat version.txt || echo unknown`.
 
 | Field | Description |
 |-------|-------------|
@@ -163,6 +163,15 @@ Collects configuration data and sends it to Perfana.
 | `output` | Output format: `key` (single value) or `json` |
 | `key` | Config key name (when `output: key`) |
 | `tags` | Tags for the config entry |
+
+## Overlay file
+
+`run start` and `validate` accept `--overlay <file>`, a second config file applied on top of `--config`:
+
+- Values set in the overlay win. Values it doesn't set are kept, and a list it sets replaces the whole list.
+- `events` are combined. Events from `--config` run first, then those from the overlay.
+
+Use this to keep shared settings in one file and test-specific settings with the test scripts.
 
 ## Environment variable substitution
 

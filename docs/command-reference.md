@@ -50,6 +50,7 @@ perfana-cli run start [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--overlay` | | Config file applied on top of `--config`; its values win and its events run last |
 | `--analysisStartOffset` | `PT5M` | Offset before analysis starts (typically the ramp-up window), ISO 8601 format |
 | `--analysisEndOffset` | | Offset before analysis ends (trims the cool-down tail), ISO 8601 format |
 | `--duration` | `PT20M` | Total test duration in ISO 8601 format. Analysis offsets select the time range to analyse within it |
