@@ -140,7 +140,7 @@ type MigratedTest struct {
 	Workload            string   `yaml:"workload"`
 	Version             string   `yaml:"version,omitempty"`
 	AnalysisStartOffset string   `yaml:"analysisStartOffset"`
-	ConstantLoadTime    string   `yaml:"constantLoadTime"`
+	Duration            string   `yaml:"duration"`
 	Tags                []string `yaml:"tags,omitempty"`
 	Annotations         string   `yaml:"annotations,omitempty"`
 }
@@ -365,7 +365,12 @@ func migratePom(pomPath string) (*MigratedConfig, []string, map[string]string, e
 
 	// Convert seconds to ISO 8601, but keep env var references as-is
 	analysisStartOffset := convertDuration(rampupResolved)
-	constantLoadTime := convertDuration(constantResolved)
+	duration := secondsToISO8601(parseIntOrZero(rampupResolved) + parseIntOrZero(constantResolved))
+	if strings.Contains(rampupResolved+constantResolved, "${") {
+		// Env var references can't be added up here, so the total has to be set by hand.
+		duration = convertDuration(constantResolved)
+		warnings = append(warnings, "test.duration: set this to the total test length (ramp-up + constant load); the values are env var references and could not be added")
+	}
 	keepAliveSec := parseIntOrZero(keepAliveResolved)
 
 	tagStr := resolve(esc.TestConfig.Tags)
@@ -411,7 +416,7 @@ func migratePom(pomPath string) (*MigratedConfig, []string, map[string]string, e
 			Workload:            resolve(esc.TestConfig.Workload),
 			Version:             resolve(esc.TestConfig.Version),
 			AnalysisStartOffset: analysisStartOffset,
-			ConstantLoadTime:    constantLoadTime,
+			Duration:            duration,
 			Tags:                tagList,
 			Annotations:         resolve(esc.TestConfig.Annotations),
 		},

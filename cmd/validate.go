@@ -79,9 +79,12 @@ func runValidate(configPath string) error {
 			errors = append(errors, fmt.Sprintf("test.analysisStartOffset: invalid ISO 8601 duration %q: %v", config.Test.AnalysisStartOffset, err))
 		}
 	}
-	if config.Test.ConstantLoadTime != "" {
-		if _, err := util.ParseISODurationToSeconds(config.Test.ConstantLoadTime); err != nil {
-			errors = append(errors, fmt.Sprintf("test.constantLoadTime: invalid ISO 8601 duration %q: %v", config.Test.ConstantLoadTime, err))
+	if !config.Test.ConstantLoadTime.IsZero() {
+		errors = append(errors, constantLoadTimeRemoved)
+	}
+	if config.Test.Duration != "" {
+		if _, err := util.ParseISODurationToSeconds(config.Test.Duration); err != nil {
+			errors = append(errors, fmt.Sprintf("test.duration: invalid ISO 8601 duration %q: %v", config.Test.Duration, err))
 		}
 	}
 

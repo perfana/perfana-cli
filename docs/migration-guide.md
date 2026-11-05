@@ -112,7 +112,7 @@ mvn event-scheduler:test -Dperfana.apiKey=$API_KEY
 ```bash
 perfana-cli run start \
   --analysisStartOffset=PT2M \
-  --constantLoadTime=PT15M
+  --duration=PT17M
 ```
 
 Or use the GitHub Action:

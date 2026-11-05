@@ -41,13 +41,15 @@ Start a test run:
 ```bash
 perfana-cli run start \
   --analysisStartOffset=PT5M \
-  --constantLoadTime=PT15M \
+  --duration=PT20M \
   --tags="k6,spring-boot" \
   --version="2.0.1" \
   --annotation="Nightly regression test"
 ```
 
-The CLI orchestrates the full event lifecycle: BeforeTest → StartTest → KeepAlive → CheckResults → AfterTest. It keeps running until the configured duration completes or you stop it with `ctrl-C`.
+The CLI orchestrates the full event lifecycle: BeforeTest → StartTest → KeepAlive → CheckResults → AfterTest. It keeps running until the configured duration completes, or until all keep-alive participants finish if any are configured, or you stop it with `ctrl-C`.
+
+Upgrading? See the [changelog](CHANGELOG.md) for breaking changes.
 
 ## Commands
 
@@ -81,7 +83,7 @@ test:
   workload: loadTest
   version: "2.0.1"
   analysisStartOffset: PT5M
-  constantLoadTime: PT15M
+  duration: PT20M
   tags:
     - k6
     - spring-boot
@@ -125,7 +127,7 @@ Use `perfana/perfana-cli` directly in your GitHub Actions workflows:
   with:
     command: run start
     config: perfana.yaml
-    args: --analysisStartOffset=PT5M --constantLoadTime=PT15M
+    args: --analysisStartOffset=PT5M --duration=PT20M
 ```
 
 ### Inputs
@@ -153,7 +155,7 @@ test:
   environment: test
   workload: loadTest
   analysisStartOffset: PT5M
-  constantLoadTime: PT15M
+  duration: PT20M
   tags:
     - ci
 ```

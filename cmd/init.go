@@ -186,7 +186,7 @@ test:
   workload: "peak-hours"                # Workload profile name
   version: "1.0.0"                      # Application version
   analysisStartOffset: "PT2M"           # Offset before analysis starts (typically the ramp-up window, ISO 8601)
-  constantLoadTime: "PT15M"             # Constant load duration (ISO 8601)
+  duration: "PT17M"                     # Total test duration, including analysis offsets (ISO 8601)
   tags:
     - "nightly"
     - "regression"

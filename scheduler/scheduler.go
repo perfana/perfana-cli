@@ -111,11 +111,13 @@ func (s *EventScheduler) Run() error {
 		logger.Warn("failed to send completion event", "err", err)
 	}
 
-	// 6. CheckResults on all events
-	if err := s.runLifecyclePhase("CheckResults", func(e Event) error {
+	// 6. CheckResults on all events. A failure is returned only after the Perfana
+	// results are reported and AfterTest cleanup has run.
+	checkErr := s.runLifecyclePhase("CheckResults", func(e Event) error {
 		return e.CheckResults(s.TestContext)
-	}); err != nil {
-		logger.Warn("check results error", "err", err)
+	})
+	if checkErr != nil {
+		logger.Warn("check results error", "err", checkErr)
 	}
 
 	// Check Perfana results
@@ -132,6 +134,10 @@ func (s *EventScheduler) Run() error {
 		return e.AfterTest(s.TestContext)
 	}); err != nil {
 		logger.Warn("after test error", "err", err)
+	}
+
+	if checkErr != nil {
+		return checkErr
 	}
 
 	logger.Info("test completed")
@@ -166,8 +172,6 @@ func (s *EventScheduler) runKeepAliveLoop() stopReason {
 	keepAliveTicker := time.NewTicker(keepAliveInterval)
 	defer keepAliveTicker.Stop()
 
-	testTimeout := time.After(time.Duration(s.TestDurationSec) * time.Second)
-
 	// Signal handling
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
@@ -190,6 +194,13 @@ func (s *EventScheduler) runKeepAliveLoop() stopReason {
 	}
 	if keepAliveParticipantCount > 0 {
 		logger.Info("keep-alive participants registered", "count", keepAliveParticipantCount)
+	}
+
+	// Participants decide when the test ends, so the duration only stops tests
+	// without them. A nil channel never fires.
+	var testTimeout <-chan time.Time
+	if keepAliveParticipantCount == 0 {
+		testTimeout = time.After(time.Duration(s.TestDurationSec) * time.Second)
 	}
 
 	// Track which keep-alive participants have signaled done

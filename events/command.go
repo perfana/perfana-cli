@@ -33,6 +33,8 @@ type CommandEvent struct {
 	commands                       CommandHooks
 	continueOnKeepAliveParticipant bool
 	keepAliveDone                  bool
+	asyncDone                      chan struct{} // closed when the async onStartTest command exits
+	asyncErr                       error         // only read after asyncDone is closed
 }
 
 // NewCommandEvent creates a CommandEvent from config.
@@ -66,6 +68,13 @@ func (e *CommandEvent) KeepAlive(ctx scheduler.TestContext) error {
 		return fmt.Errorf("keep-alive participant already done")
 	}
 
+	select {
+	case <-e.asyncDone:
+		e.keepAliveDone = true
+		return fmt.Errorf("keep-alive participant done: onStartTest command exited")
+	default:
+	}
+
 	if e.commands.OnKeepAlive == "" {
 		return nil
 	}
@@ -90,7 +99,13 @@ func (e *CommandEvent) OnEvent(ctx scheduler.TestContext, settings map[string]st
 }
 
 func (e *CommandEvent) CheckResults(ctx scheduler.TestContext) error {
-	// Command events don't check results
+	select {
+	case <-e.asyncDone:
+		if e.asyncErr != nil {
+			return fmt.Errorf("onStartTest command failed: %w", e.asyncErr)
+		}
+	default:
+	}
 	return nil
 }
 
@@ -119,9 +134,12 @@ func (e *CommandEvent) runCommandAsync(ctx scheduler.TestContext, command, phase
 		return fmt.Errorf("command failed to start: %w", err)
 	}
 
+	e.asyncDone = make(chan struct{})
 	go func() {
-		if err := cmd.Wait(); err != nil {
-			logger.Warn("async command error", "event", e.name, "phase", phase, "err", err)
+		e.asyncErr = cmd.Wait()
+		close(e.asyncDone)
+		if e.asyncErr != nil {
+			logger.Warn("async command error", "event", e.name, "phase", phase, "err", e.asyncErr)
 		} else {
 			logger.Info("async command completed", "event", e.name, "phase", phase)
 		}

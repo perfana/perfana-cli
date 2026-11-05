@@ -73,12 +73,12 @@ perfana-cli init \
 
 ## Step 2: Run a test session
 
-Start a test session with a 5-minute rampup and 15-minute constant load:
+Start a 20-minute test session, leaving the first 5 minutes out of the analysis:
 
 ```bash
 perfana-cli run start \
   --analysisStartOffset=PT5M \
-  --constantLoadTime=PT15M \
+  --duration=PT20M \
   --version="1.2.0" \
   --tags="k6,nightly" \
   --annotation="Nightly baseline test"
@@ -87,7 +87,7 @@ perfana-cli run start \
 The CLI will:
 1. Initialize a test session with Perfana (`POST /init`)
 2. Send keep-alive heartbeats every 30 seconds
-3. Run for the total duration (rampup + constant load)
+3. Run for the configured duration
 4. Complete the session and trigger analysis
 
 To stop early, press `Ctrl+C`.
@@ -99,7 +99,7 @@ Enrich your test session with deep links and variables:
 ```bash
 perfana-cli run start \
   --analysisStartOffset=PT2M \
-  --constantLoadTime=PT10M \
+  --duration=PT12M \
   --version="1.2.0" \
   --tags="k6,spring-boot" \
   --deeplink "Grafana|https://grafana.example.com/d/abc" \

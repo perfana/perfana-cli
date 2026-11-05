@@ -20,7 +20,7 @@ test:
   version: "1.0.0"
   analysisStartOffset: "PT2M"
   analysisEndOffset: "PT1M"
-  constantLoadTime: "PT15M"
+  duration: "PT17M"
   tags:
     - "nightly"
   annotations: "Nightly peak-hour simulation"
@@ -81,7 +81,7 @@ events:
 | `version` | No | | Version of the system under test |
 | `analysisStartOffset` | No | `PT5M` | Offset before analysis starts (typically the ramp-up window, ISO 8601) |
 | `analysisEndOffset` | No | | Offset before analysis ends (trims the cool-down tail), ISO 8601 |
-| `constantLoadTime` | No | `PT15M` | Constant load duration (ISO 8601) |
+| `duration` | No | `PT20M` | Total test duration (ISO 8601). Analysis offsets select the time range to analyse within it |
 | `tags` | No | | List of tags for filtering and grouping |
 | `annotations` | No | | Free-text annotation for the test run |
 | `deepLinks` | No | | Links displayed in the Perfana dashboard |
@@ -134,8 +134,9 @@ Events define actions that run at specific lifecycle points.
 When `true`, this event participates in consensus-based test stopping:
 
 - **`onStartTest`** runs **asynchronously** (non-blocking), so multiple load generators can start in parallel.
-- **`onKeepAlive`** is called every tick. When the command fails (non-zero exit), the participant signals "done".
-- **The test stops early** when **all** `continueOnKeepAliveParticipant` events have signaled done. If only some are done, the test keeps running.
+- **`onKeepAlive`** is optional and is called every tick. When the command fails (non-zero exit), the participant signals "done". The participant also signals "done" when its `onStartTest` command exits.
+- **The test stops** when **all** `continueOnKeepAliveParticipant` events have signaled done. If only some are done, the test keeps running. `duration` does not stop a test that has participants.
+- **A failing `onStartTest`** makes `run start` exit non-zero when `scheduler.failOnError` is `true`.
 - **`onBeforeTest`** always runs **synchronously**, even for keep-alive participants. Use this for setup that must complete before the test starts (e.g. `kubectl rollout status`).
 
 This matches the Java event-scheduler's `StopTestRunException` consensus behavior.

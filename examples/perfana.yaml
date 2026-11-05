@@ -17,7 +17,7 @@ test:
   version: "1.0.0"
   analysisStartOffset: "PT2M"
   analysisEndOffset: "PT1M"
-  constantLoadTime: "PT15M"
+  duration: "PT17M"
   tags:
     - "nightly"
   annotations: "Nightly peak-hour simulation"

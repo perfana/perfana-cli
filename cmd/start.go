@@ -46,12 +46,15 @@ type TestConfig struct {
 	Version             string                    `yaml:"version"`
 	AnalysisStartOffset string                    `yaml:"analysisStartOffset"`
 	AnalysisEndOffset   string                    `yaml:"analysisEndOffset"`
-	ConstantLoadTime    string                    `yaml:"constantLoadTime"`
+	Duration            string                    `yaml:"duration"`
+	ConstantLoadTime    yaml.Node                 `yaml:"constantLoadTime"` // removed; only read to reject it
 	Tags                []string                  `yaml:"tags"`
 	Annotations         string                    `yaml:"annotations"`
 	DeepLinks           []perfana_client.DeepLink `yaml:"deepLinks"`
 	Variables           []VariableConfig          `yaml:"variables"`
 }
+
+const constantLoadTimeRemoved = "test.constantLoadTime has been removed: set test.duration to the total test length (analysisStartOffset + constantLoadTime)"
 
 // VariableConfig holds a placeholder/value pair from YAML.
 type VariableConfig struct {
@@ -85,7 +88,8 @@ type EventConfig struct {
 // Define command-line flags with default values
 var (
 	analysisStartOffset string
-	constantLoadTime    string
+	analysisEndOffset   string
+	testDuration        string
 	tags                string
 	annotation          string
 	testVersion         string
@@ -108,7 +112,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
 				fmt.Println("Error finding home directory:", err)
-				return
+				os.Exit(1)
 			}
 			configPath = filepath.Join(homeDir, ".perfana-cli", "perfana.yaml")
 		}
@@ -123,7 +127,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 		file, err := os.ReadFile(configPath)
 		if err != nil {
 			fmt.Printf("Error reading configuration file: %v\n", err)
-			return
+			os.Exit(1)
 		}
 
 		// Expand environment variables in YAML content
@@ -133,7 +137,11 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 		var fullConfig FullConfig
 		if err := yaml.Unmarshal([]byte(expandedContent), &fullConfig); err != nil {
 			fmt.Printf("Error parsing configuration file: %v\n", err)
-			return
+			os.Exit(1)
+		}
+		if !fullConfig.Test.ConstantLoadTime.IsZero() {
+			fmt.Printf("Error in configuration file: %s\n", constantLoadTimeRemoved)
+			os.Exit(1)
 		}
 
 		// Apply test config to perfana client config if not set directly
@@ -150,23 +158,23 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 
 		// CLI flags override YAML values
 		effectiveAnalysisStartOffset := fullConfig.Test.AnalysisStartOffset
-		if analysisStartOffset != "" && analysisStartOffset != "PT5M" {
+		if analysisStartOffset != "" {
 			effectiveAnalysisStartOffset = analysisStartOffset
 		}
 		if effectiveAnalysisStartOffset == "" {
 			effectiveAnalysisStartOffset = "PT5M"
 		}
 
-		effectiveConstant := fullConfig.Test.ConstantLoadTime
-		if constantLoadTime != "" && constantLoadTime != "PT15M" {
-			effectiveConstant = constantLoadTime
+		effectiveDuration := fullConfig.Test.Duration
+		if testDuration != "" {
+			effectiveDuration = testDuration
 		}
-		if effectiveConstant == "" {
-			effectiveConstant = "PT15M"
+		if effectiveDuration == "" {
+			effectiveDuration = "PT20M"
 		}
 
 		effectiveVersion := fullConfig.Test.Version
-		if testVersion != "" && testVersion != "1.0.0" {
+		if testVersion != "" {
 			effectiveVersion = testVersion
 		}
 
@@ -186,32 +194,36 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 		analysisStartOffsetSec, err := util.ParseISODurationToSeconds(effectiveAnalysisStartOffset)
 		if err != nil {
 			fmt.Printf("Error parsing analysisStartOffset: %v\n", err)
-			return
+			os.Exit(1)
+		}
+
+		effectiveAnalysisEndOffset := fullConfig.Test.AnalysisEndOffset
+		if analysisEndOffset != "" {
+			effectiveAnalysisEndOffset = analysisEndOffset
 		}
 
 		analysisEndOffsetSec := 0
-		if fullConfig.Test.AnalysisEndOffset != "" {
-			analysisEndOffsetSec, err = util.ParseISODurationToSeconds(fullConfig.Test.AnalysisEndOffset)
+		if effectiveAnalysisEndOffset != "" {
+			analysisEndOffsetSec, err = util.ParseISODurationToSeconds(effectiveAnalysisEndOffset)
 			if err != nil {
 				fmt.Printf("Error parsing analysisEndOffset: %v\n", err)
-				return
+				os.Exit(1)
 			}
 		}
 
-		constantLoadSec, err := util.ParseISODurationToSeconds(effectiveConstant)
+		durationSec, err := util.ParseISODurationToSeconds(effectiveDuration)
 		if err != nil {
-			fmt.Printf("Error parsing constantLoadTime: %v\n", err)
-			return
+			fmt.Printf("Error parsing duration: %v\n", err)
+			os.Exit(1)
 		}
 
-		totalDurationSec := analysisStartOffsetSec + constantLoadSec
-		logger.Info("starting test run", "durationSec", totalDurationSec, "analysisStartOffsetSec", analysisStartOffsetSec, "constantLoadSec", constantLoadSec)
+		logger.Info("starting test run", "durationSec", durationSec, "analysisStartOffsetSec", analysisStartOffsetSec)
 
 		// Initialize the Perfana client
 		client, err := perfana_client.NewClient(config)
 		if err != nil {
 			fmt.Printf("Error initializing Perfana client: %v\n", err)
-			return
+			os.Exit(1)
 		}
 
 		// Build tag list from YAML + CLI
@@ -245,7 +257,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			Annotations:         effectiveAnnotation,
 			AnalysisStartOffset: analysisStartOffsetSec,
 			AnalysisEndOffset:   analysisEndOffsetSec,
-			Duration:            constantLoadSec,
+			Duration:            durationSec,
 			BuildResultsUrl:     effectiveBuildResultsUrl,
 			DeepLinks:           fullConfig.Test.DeepLinks,
 			Client:              client,
@@ -288,7 +300,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			scheduleEntries, err = scheduler.ParseScheduleScript(fullConfig.Scheduler.ScheduleScript)
 			if err != nil {
 				fmt.Printf("Error parsing schedule script: %v\n", err)
-				return
+				os.Exit(1)
 			}
 			logger.Info("schedule parsed", "entries", len(scheduleEntries))
 		}
@@ -304,7 +316,7 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 			Events:               eventList,
 			ScheduleEntries:      scheduleEntries,
 			KeepAliveIntervalSec: keepAliveInterval,
-			TestDurationSec:      totalDurationSec,
+			TestDurationSec:      durationSec,
 			TestContext:          testCtx,
 			FailOnError:          fullConfig.Scheduler.FailOnError,
 		}
@@ -323,7 +335,8 @@ func init() {
 	runCmd.AddCommand(startCmd)
 
 	startCmd.Flags().StringVar(&analysisStartOffset, "analysisStartOffset", "", "Offset before analysis starts (typically the ramp-up window) in ISO8601 format (e.g., PT5M). Overrides YAML.")
-	startCmd.Flags().StringVar(&constantLoadTime, "constantLoadTime", "", "Constant load time in ISO8601 format (e.g., PT15M). Overrides YAML.")
+	startCmd.Flags().StringVar(&analysisEndOffset, "analysisEndOffset", "", "Trailing period excluded from analysis (typically the ramp-down window) in ISO8601 format (e.g., PT1M). Overrides YAML.")
+	startCmd.Flags().StringVar(&testDuration, "duration", "", "Total test duration in ISO8601 format, including any analysis offsets (e.g., PT20M). Overrides YAML.")
 	startCmd.Flags().StringVar(&tags, "tags", "", "Comma-separated tags to add to the test session (merged with YAML tags)")
 	startCmd.Flags().StringVar(&annotation, "annotation", "", "Annotation message for the test session")
 	startCmd.Flags().StringVar(&testVersion, "version", "", "Version of the test session. Overrides YAML.")

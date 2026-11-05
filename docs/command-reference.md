@@ -40,7 +40,7 @@ perfana-cli init \
 
 ## `perfana-cli run start`
 
-Start a Perfana test session with full event lifecycle orchestration. Runs until the total duration (rampup + constant load) elapses or the process is killed.
+Start a Perfana test session with full event lifecycle orchestration. Runs until the duration elapses, or until all keep-alive participants finish if any are configured, or until the process is killed.
 
 ```bash
 perfana-cli run start [flags]
@@ -52,7 +52,7 @@ perfana-cli run start [flags]
 |------|---------|-------------|
 | `--analysisStartOffset` | `PT5M` | Offset before analysis starts (typically the ramp-up window), ISO 8601 format |
 | `--analysisEndOffset` | | Offset before analysis ends (trims the cool-down tail), ISO 8601 format |
-| `--constantLoadTime` | `PT15M` | Constant load duration in ISO 8601 format |
+| `--duration` | `PT20M` | Total test duration in ISO 8601 format. Analysis offsets select the time range to analyse within it |
 | `--version` | `1.0.0` | Version of the system under test |
 | `--tags` | `k6,jfr` | Comma-separated tags for the test session |
 | `--annotation` | | Annotation message for the test session |
@@ -82,7 +82,7 @@ Durations use ISO 8601 format:
 ```bash
 perfana-cli run start \
   --analysisStartOffset=PT2M \
-  --constantLoadTime=PT20M \
+  --duration=PT22M \
   --version="2.1.0" \
   --tags="gatling,sprint-42" \
   --annotation="Sprint 42 regression test" \
