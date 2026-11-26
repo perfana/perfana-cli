@@ -31,9 +31,11 @@ test:
     - placeholder: "__region__"
       value: "eu-west-1"
   additionalSutMonitoring:
-    - systemUnderTest: "MyDatabase"
-      testEnvironment: "loadtest"
-      profile: "k8s-monitoring-only"
+    - systemUnderTest: "payment-db"
+      testEnvironment: "acceptance"
+    - systemUnderTest: "kafka"
+      testEnvironment: "acceptance"
+      tags: ["kafka"]
 
 scheduler:
   enabled: true
@@ -95,9 +97,9 @@ events:
 | `variables[].placeholder` | Yes | | Variable name |
 | `variables[].value` | Yes | | Variable value |
 | `additionalSutMonitoring` | No | | Extra system under test / environment combinations whose dashboards, profile SLOs and series-grouping rules grafana-sync auto-config adds to this run. They are stored under the run's own SUT/environment; no SUT/environment is created for them. At most 20 entries |
-| `additionalSutMonitoring[].systemUnderTest` | Yes | | System under test to monitor (max 255 characters) |
-| `additionalSutMonitoring[].testEnvironment` | Yes | | Test environment to monitor (max 255 characters) |
-| `additionalSutMonitoring[].profile` | No | | Profile to apply. Omitted: the profiles the run's tags match |
+| `additionalSutMonitoring[].systemUnderTest` | Yes | | System under test to monitor (1-100 characters: letters, digits, `.`, `_`, `-`) |
+| `additionalSutMonitoring[].testEnvironment` | Yes | | Test environment to monitor (1-100 characters: letters, digits, `.`, `_`, `-`) |
+| `additionalSutMonitoring[].tags` | No | | The entry gets the profiles that share at least one of these tags (same organization as the run). Omitted or empty: the profiles the run's own tags match. At most 50 tags, each 1-100 characters |
 
 ### `scheduler` - Event scheduler settings
 

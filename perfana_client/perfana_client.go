@@ -46,9 +46,9 @@ type PerfanaMessage struct {
 
 // SutMonitoring names an extra system under test / environment to monitor during a run.
 type SutMonitoring struct {
-	SystemUnderTest string `json:"systemUnderTest" yaml:"systemUnderTest"`
-	TestEnvironment string `json:"testEnvironment" yaml:"testEnvironment"`
-	Profile         string `json:"profile,omitempty" yaml:"profile"`
+	SystemUnderTest string   `json:"systemUnderTest" yaml:"systemUnderTest"`
+	TestEnvironment string   `json:"testEnvironment" yaml:"testEnvironment"`
+	Tags            []string `json:"tags,omitempty" yaml:"tags"` // empty = the run's tags pick the profiles
 }
 
 // Variable is used in PerfanaMessage to send key-value pairs
