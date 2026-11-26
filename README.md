@@ -93,6 +93,10 @@ test:
   variables:
     - placeholder: service
       value: my-service
+  additionalSutMonitoring:      # extra SUT/env monitoring added by grafana-sync auto-config
+    - systemUnderTest: my-database
+      testEnvironment: test
+      profile: k8s-monitoring-only  # optional; omitted = the profiles the run's tags match
 
 scheduler:
   enabled: true

@@ -40,6 +40,15 @@ type PerfanaMessage struct {
 	Tags                []string   `json:"tags,omitempty"`        // Optional
 	Variables           []Variable `json:"variables,omitempty"`   // Optional
 	DeepLinks           []DeepLink `json:"deepLinks,omitempty"`   // Optional
+	// Optional extra SUT/env combinations whose monitoring grafana-sync auto-config adds to this run
+	AdditionalSutMonitoring []SutMonitoring `json:"additionalSutMonitoring,omitempty"`
+}
+
+// SutMonitoring names an extra system under test / environment to monitor during a run.
+type SutMonitoring struct {
+	SystemUnderTest string `json:"systemUnderTest" yaml:"systemUnderTest"`
+	TestEnvironment string `json:"testEnvironment" yaml:"testEnvironment"`
+	Profile         string `json:"profile,omitempty" yaml:"profile"`
 }
 
 // Variable is used in PerfanaMessage to send key-value pairs
@@ -58,36 +67,36 @@ type DeepLink struct {
 
 // TestRunResult represents the response from the test run status API.
 type TestRunResult struct {
-	ID                   string   `json:"id"`
-	TestRunID            string   `json:"test_run_id"`
-	TestEnvironment      string   `json:"test_environment"`
-	Workload             string   `json:"workload"`
-	StartTime            string   `json:"start_time"`
-	EndTime              string   `json:"end_time"`
-	Duration             int      `json:"duration"`
-	PlannedDuration      int      `json:"planned_duration"`
-	AnalysisStartOffset  int      `json:"analysis_start_offset"`
-	Completed            bool     `json:"completed"`
-	Abort                bool     `json:"abort"`
-	Valid                bool     `json:"valid"`
-	CompletionPercentage int      `json:"completion_percentage"`
-	Status *struct {
-		LastUpdate      string `json:"lastUpdate"`
-		EvaluatingAdapt string `json:"evaluatingAdapt"`
+	ID                   string `json:"id"`
+	TestRunID            string `json:"test_run_id"`
+	TestEnvironment      string `json:"test_environment"`
+	Workload             string `json:"workload"`
+	StartTime            string `json:"start_time"`
+	EndTime              string `json:"end_time"`
+	Duration             int    `json:"duration"`
+	PlannedDuration      int    `json:"planned_duration"`
+	AnalysisStartOffset  int    `json:"analysis_start_offset"`
+	Completed            bool   `json:"completed"`
+	Abort                bool   `json:"abort"`
+	Valid                bool   `json:"valid"`
+	CompletionPercentage int    `json:"completion_percentage"`
+	Status               *struct {
+		LastUpdate       string `json:"lastUpdate"`
+		EvaluatingAdapt  string `json:"evaluatingAdapt"`
 		EvaluatingChecks string `json:"evaluatingChecks"`
 	} `json:"status"`
 	ConsolidatedResult *struct {
-		Overall         bool `json:"overall"`
+		Overall          bool `json:"overall"`
 		MeetsRequirement bool `json:"meetsRequirement"`
 	} `json:"consolidated_result"`
-	ApplicationRelease   string   `json:"application_release"`
-	Tags                 []string `json:"tags"`
-	Annotations          []string `json:"annotations"`
-	IsChangepoint        bool     `json:"is_changepoint"`
-	AdaptConfig          struct {
+	ApplicationRelease string   `json:"application_release"`
+	Tags               []string `json:"tags"`
+	Annotations        []string `json:"annotations"`
+	IsChangepoint      bool     `json:"is_changepoint"`
+	AdaptConfig        struct {
 		Mode string `json:"mode"`
 	} `json:"adapt_config"`
-	SystemsUnderTest     struct {
+	SystemsUnderTest struct {
 		Name string `json:"name"`
 	} `json:"systems_under_test"`
 }
@@ -100,9 +109,9 @@ type CheckRequirement struct {
 
 // CheckTarget holds per-target result data.
 type CheckTarget struct {
-	Target          string  `json:"target"`
-	Value           float64 `json:"value"`
-	MeetsRequirement bool   `json:"meets_requirement"`
+	Target           string  `json:"target"`
+	Value            float64 `json:"value"`
+	MeetsRequirement bool    `json:"meets_requirement"`
 }
 
 // CheckResult represents a single SLO check result.
@@ -290,6 +299,9 @@ func (c *PerfanaClient) TestEvent(testRunID string, additionalData map[string]in
 	if deepLinks, ok := additionalData["deepLinks"]; ok {
 		message.DeepLinks = deepLinks.([]DeepLink)
 	}
+	if sm, ok := additionalData["additionalSutMonitoring"]; ok {
+		message.AdditionalSutMonitoring = sm.([]SutMonitoring)
+	}
 
 	reqBody, err := json.Marshal(message)
 	if err != nil {
@@ -419,6 +431,9 @@ func (c *PerfanaClient) AbortTest(testRunID string, additionalData map[string]in
 	}
 	if version, ok := additionalData["version"]; ok {
 		message.Version = version.(string)
+	}
+	if sm, ok := additionalData["additionalSutMonitoring"]; ok {
+		message.AdditionalSutMonitoring = sm.([]SutMonitoring)
 	}
 
 	reqBody, err := json.Marshal(message)

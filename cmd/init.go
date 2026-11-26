@@ -52,7 +52,7 @@ var initCmd = &cobra.Command{
 		// Initialize default configuration
 		config := perfana_client.Configuration{
 			ApiKey:           "your-api-key",
-			ApiUrl:          "http://localhost:4000",
+			ApiUrl:           "http://localhost:4000",
 			ClientIdentifier: "your-client-identifier",
 			SystemUnderTest:  "your-system-under-test",
 			Environment:      "your-environment",
@@ -197,6 +197,10 @@ test:
   # variables:                          # Custom variables for command substitution
   #   - placeholder: "__region__"
   #     value: "eu-west-1"
+  # additionalSutMonitoring:            # Extra SUT/environment monitoring that grafana-sync
+  #   - systemUnderTest: "my-database"  # auto-config adds to this run (max 20 entries)
+  #     testEnvironment: "loadtest"
+  #     profile: "k8s-monitoring-only"  # Optional; omitted = the profiles the run's tags match
 
 # Event scheduler settings
 scheduler:

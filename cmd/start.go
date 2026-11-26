@@ -17,9 +17,9 @@ package cmd
 
 import (
 	"fmt"
-	"perfana-cli/logger"
 	"os"
 	"path/filepath"
+	"perfana-cli/logger"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -40,21 +40,44 @@ type FullConfig struct {
 
 // TestConfig holds test-level settings from YAML.
 type TestConfig struct {
-	SystemUnderTest     string                    `yaml:"systemUnderTest"`
-	Environment         string                    `yaml:"environment"`
-	Workload            string                    `yaml:"workload"`
-	Version             string                    `yaml:"version"`
-	AnalysisStartOffset string                    `yaml:"analysisStartOffset"`
-	AnalysisEndOffset   string                    `yaml:"analysisEndOffset"`
-	Duration            string                    `yaml:"duration"`
-	ConstantLoadTime    yaml.Node                 `yaml:"constantLoadTime"` // removed; only read to reject it
-	Tags                []string                  `yaml:"tags"`
-	Annotations         string                    `yaml:"annotations"`
-	DeepLinks           []perfana_client.DeepLink `yaml:"deepLinks"`
-	Variables           []VariableConfig          `yaml:"variables"`
+	SystemUnderTest         string                         `yaml:"systemUnderTest"`
+	Environment             string                         `yaml:"environment"`
+	Workload                string                         `yaml:"workload"`
+	Version                 string                         `yaml:"version"`
+	AnalysisStartOffset     string                         `yaml:"analysisStartOffset"`
+	AnalysisEndOffset       string                         `yaml:"analysisEndOffset"`
+	Duration                string                         `yaml:"duration"`
+	ConstantLoadTime        yaml.Node                      `yaml:"constantLoadTime"` // removed; only read to reject it
+	Tags                    []string                       `yaml:"tags"`
+	Annotations             string                         `yaml:"annotations"`
+	DeepLinks               []perfana_client.DeepLink      `yaml:"deepLinks"`
+	Variables               []VariableConfig               `yaml:"variables"`
+	AdditionalSutMonitoring []perfana_client.SutMonitoring `yaml:"additionalSutMonitoring"`
 }
 
 const constantLoadTimeRemoved = "test.constantLoadTime has been removed: set test.duration to the total test length (analysisStartOffset + constantLoadTime)"
+
+// sutMonitoringErrors applies the API's limits on test.additionalSutMonitoring, so a bad
+// config fails before the test starts instead of with a 400 from Perfana.
+func sutMonitoringErrors(entries []perfana_client.SutMonitoring) []string {
+	var errs []string
+	if len(entries) > 20 {
+		errs = append(errs, fmt.Sprintf("test.additionalSutMonitoring: at most 20 entries allowed (got %d)", len(entries)))
+	}
+	for i, e := range entries {
+		for _, f := range []struct {
+			name, value string
+			optional    bool
+		}{{"systemUnderTest", e.SystemUnderTest, false}, {"testEnvironment", e.TestEnvironment, false}, {"profile", e.Profile, true}} {
+			if f.value == "" && !f.optional {
+				errs = append(errs, fmt.Sprintf("test.additionalSutMonitoring[%d].%s is required", i, f.name))
+			} else if len(f.value) > 255 {
+				errs = append(errs, fmt.Sprintf("test.additionalSutMonitoring[%d].%s: at most 255 characters allowed", i, f.name))
+			}
+		}
+	}
+	return errs
+}
 
 // VariableConfig holds a placeholder/value pair from YAML.
 type VariableConfig struct {
@@ -156,6 +179,10 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 		}
 		if !fullConfig.Test.ConstantLoadTime.IsZero() {
 			fmt.Printf("Error in configuration file: %s\n", constantLoadTimeRemoved)
+			os.Exit(1)
+		}
+		if errs := sutMonitoringErrors(fullConfig.Test.AdditionalSutMonitoring); len(errs) > 0 {
+			fmt.Printf("Error in configuration file: %s\n", strings.Join(errs, "; "))
 			os.Exit(1)
 		}
 
@@ -263,19 +290,20 @@ orchestration. It runs BeforeTest → StartTest → KeepAlive loop → CheckResu
 
 		// Build test context
 		testCtx := scheduler.TestContext{
-			SystemUnderTest:     config.SystemUnderTest,
-			Environment:         config.Environment,
-			Workload:            config.Workload,
-			Version:             effectiveVersion,
-			Tags:                tagList,
-			Variables:           variables,
-			Annotations:         effectiveAnnotation,
-			AnalysisStartOffset: analysisStartOffsetSec,
-			AnalysisEndOffset:   analysisEndOffsetSec,
-			Duration:            durationSec,
-			BuildResultsUrl:     effectiveBuildResultsUrl,
-			DeepLinks:           fullConfig.Test.DeepLinks,
-			Client:              client,
+			SystemUnderTest:         config.SystemUnderTest,
+			Environment:             config.Environment,
+			Workload:                config.Workload,
+			Version:                 effectiveVersion,
+			Tags:                    tagList,
+			Variables:               variables,
+			Annotations:             effectiveAnnotation,
+			AnalysisStartOffset:     analysisStartOffsetSec,
+			AnalysisEndOffset:       analysisEndOffsetSec,
+			Duration:                durationSec,
+			BuildResultsUrl:         effectiveBuildResultsUrl,
+			DeepLinks:               fullConfig.Test.DeepLinks,
+			AdditionalSutMonitoring: fullConfig.Test.AdditionalSutMonitoring,
+			Client:                  client,
 		}
 
 		// Parse events from YAML config
