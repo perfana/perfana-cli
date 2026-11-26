@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- **`additionalSutMonitoring` entries take `tags` instead of `profile`.** With `tags`, an entry gets the profiles that share at least one of those tags. Without `tags`, it gets the profiles the run's own tags match. Perfana no longer reads `profile`, and the CLI now ignores it, so move any `profile` to `tags`:
+
+  ```yaml
+  # Before
+  - {systemUnderTest: kafka, testEnvironment: acceptance, profile: kafka}
+  # After
+  - {systemUnderTest: kafka, testEnvironment: acceptance, tags: [kafka]}
+  ```
+
+- **Stricter `additionalSutMonitoring` validation**, to match the API: `systemUnderTest` and `testEnvironment` must be 1-100 characters of letters, digits, `.`, `_` or `-`. An entry can have at most 50 tags, each 1-100 characters.
+
 ## v0.9.0 (2026-11-26)
 
 ### Features

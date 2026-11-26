@@ -33,7 +33,7 @@ events:
 perfana: {apiUrl: "http://base", apiKey: base-key}
 test:
   tags: [k6]
-  additionalSutMonitoring: [{systemUnderTest: foo, testEnvironment: bar, profile: k8s}]
+  additionalSutMonitoring: [{systemUnderTest: foo, testEnvironment: bar, tags: [kafka]}]
 scheduler: {failOnError: true}
 events:
   - {name: workers, type: command}
@@ -56,7 +56,7 @@ events:
 	if strings.Join(config.Test.Tags, ",") != "douane,k6" {
 		t.Errorf("want tags douane,k6, got %v", config.Test.Tags)
 	}
-	if sm := config.Test.AdditionalSutMonitoring; len(sm) != 1 || sm[0].SystemUnderTest != "foo" || sm[0].Profile != "k8s" {
+	if sm := config.Test.AdditionalSutMonitoring; len(sm) != 1 || sm[0].SystemUnderTest != "foo" || strings.Join(sm[0].Tags, ",") != "kafka" {
 		t.Errorf("overlay additionalSutMonitoring should replace, got %+v", sm)
 	}
 	if len(config.Events) != 2 || config.Events[0].Name != "collector" || config.Events[1].Name != "workers" {
@@ -67,9 +67,9 @@ events:
 func TestSutMonitoringPayload(t *testing.T) {
 	b, _ := json.Marshal(perfana_client.PerfanaMessage{AdditionalSutMonitoring: []perfana_client.SutMonitoring{
 		{SystemUnderTest: "foo", TestEnvironment: "bar"},
-		{SystemUnderTest: "acme", TestEnvironment: "test", Profile: "k8s"},
+		{SystemUnderTest: "acme", TestEnvironment: "test", Tags: []string{"kafka"}},
 	}})
-	want := `"additionalSutMonitoring":[{"systemUnderTest":"foo","testEnvironment":"bar"},{"systemUnderTest":"acme","testEnvironment":"test","profile":"k8s"}]`
+	want := `"additionalSutMonitoring":[{"systemUnderTest":"foo","testEnvironment":"bar"},{"systemUnderTest":"acme","testEnvironment":"test","tags":["kafka"]}]`
 	if !strings.Contains(string(b), want) {
 		t.Errorf("want %s in %s", want, b)
 	}
@@ -79,16 +79,18 @@ func TestSutMonitoringPayload(t *testing.T) {
 }
 
 func TestSutMonitoringErrors(t *testing.T) {
-	ok := perfana_client.SutMonitoring{SystemUnderTest: "foo", TestEnvironment: "bar"}
+	ok := perfana_client.SutMonitoring{SystemUnderTest: "payment-db", TestEnvironment: "acc_1.0", Tags: []string{"kafka"}}
 	if errs := sutMonitoringErrors([]perfana_client.SutMonitoring{ok}); len(errs) != 0 {
 		t.Errorf("valid entry rejected: %v", errs)
 	}
 	if errs := sutMonitoringErrors(make([]perfana_client.SutMonitoring, 21)); len(errs) != 1+21*2 {
 		t.Errorf("want count error plus 2 required errors per entry, got %d: %v", len(errs), errs)
 	}
-	long := ok
-	long.Profile = strings.Repeat("x", 256)
-	if errs := sutMonitoringErrors([]perfana_client.SutMonitoring{long}); len(errs) != 1 {
-		t.Errorf("want 1 length error, got %v", errs)
+	bad := ok
+	bad.SystemUnderTest = "has space"
+	bad.TestEnvironment = strings.Repeat("x", 101)
+	bad.Tags = append(make([]string, 50), strings.Repeat("ü", 100)) // 51 tags, 50 empty; 100 runes is fine
+	if errs := sutMonitoringErrors([]perfana_client.SutMonitoring{bad}); len(errs) != 2+1+50 {
+		t.Errorf("want 2 name errors, 1 tag count error and 50 empty-tag errors, got %d: %v", len(errs), errs)
 	}
 }

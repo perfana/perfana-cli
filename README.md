@@ -94,9 +94,11 @@ test:
     - placeholder: service
       value: my-service
   additionalSutMonitoring:      # extra SUT/env monitoring added by grafana-sync auto-config
-    - systemUnderTest: my-database
-      testEnvironment: test
-      profile: k8s-monitoring-only  # optional; omitted = the profiles the run's tags match
+    - systemUnderTest: payment-db
+      testEnvironment: acceptance
+    - systemUnderTest: kafka
+      testEnvironment: acceptance
+      tags: [kafka]             # optional; profiles matching these tags instead of the run's tags
 
 scheduler:
   enabled: true

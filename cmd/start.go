@@ -20,7 +20,9 @@ import (
 	"os"
 	"path/filepath"
 	"perfana-cli/logger"
+	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -65,19 +67,25 @@ func sutMonitoringErrors(entries []perfana_client.SutMonitoring) []string {
 		errs = append(errs, fmt.Sprintf("test.additionalSutMonitoring: at most 20 entries allowed (got %d)", len(entries)))
 	}
 	for i, e := range entries {
-		for _, f := range []struct {
-			name, value string
-			optional    bool
-		}{{"systemUnderTest", e.SystemUnderTest, false}, {"testEnvironment", e.TestEnvironment, false}, {"profile", e.Profile, true}} {
-			if f.value == "" && !f.optional {
-				errs = append(errs, fmt.Sprintf("test.additionalSutMonitoring[%d].%s is required", i, f.name))
-			} else if len(f.value) > 255 {
-				errs = append(errs, fmt.Sprintf("test.additionalSutMonitoring[%d].%s: at most 255 characters allowed", i, f.name))
+		prefix := fmt.Sprintf("test.additionalSutMonitoring[%d]", i)
+		for _, f := range [][2]string{{"systemUnderTest", e.SystemUnderTest}, {"testEnvironment", e.TestEnvironment}} {
+			if !sutNamePattern.MatchString(f[1]) {
+				errs = append(errs, fmt.Sprintf("%s.%s must be 1-100 characters of a-z, A-Z, 0-9, '.', '_' or '-' (got %q)", prefix, f[0], f[1]))
+			}
+		}
+		if len(e.Tags) > 50 {
+			errs = append(errs, fmt.Sprintf("%s.tags: at most 50 tags allowed (got %d)", prefix, len(e.Tags)))
+		}
+		for j, tag := range e.Tags {
+			if n := utf8.RuneCountInString(tag); n < 1 || n > 100 {
+				errs = append(errs, fmt.Sprintf("%s.tags[%d] must be 1-100 characters", prefix, j))
 			}
 		}
 	}
 	return errs
 }
+
+var sutNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,100}$`)
 
 // VariableConfig holds a placeholder/value pair from YAML.
 type VariableConfig struct {

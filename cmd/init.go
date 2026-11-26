@@ -198,9 +198,11 @@ test:
   #   - placeholder: "__region__"
   #     value: "eu-west-1"
   # additionalSutMonitoring:            # Extra SUT/environment monitoring that grafana-sync
-  #   - systemUnderTest: "my-database"  # auto-config adds to this run (max 20 entries)
-  #     testEnvironment: "loadtest"
-  #     profile: "k8s-monitoring-only"  # Optional; omitted = the profiles the run's tags match
+  #   - systemUnderTest: "payment-db"   # auto-config adds to this run (max 20 entries)
+  #     testEnvironment: "acceptance"
+  #   - systemUnderTest: "kafka"
+  #     testEnvironment: "acceptance"
+  #     tags: ["kafka"]                 # Optional; profiles matching these tags instead of the run's tags
 
 # Event scheduler settings
 scheduler:
