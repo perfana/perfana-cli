@@ -81,6 +81,8 @@ func runValidate(configPath string) error {
 		}
 	}
 
+	errors = append(errors, sutMonitoringErrors(config.Test.AdditionalSutMonitoring)...)
+
 	// Validate scheduler
 	if config.Scheduler.KeepAliveIntervalSeconds < 0 {
 		errors = append(errors, "scheduler.keepAliveIntervalSeconds must be >= 0")

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- **`test.additionalSutMonitoring`.** List extra `systemUnderTest`/`testEnvironment` combinations (with an optional `profile`) whose dashboards, profile SLOs and series-grouping rules grafana-sync auto-config adds to the run. They are stored under the run's own SUT/environment; no SUT/environment is created for them. The list is sent on every test-run call. An overlay that sets it replaces the list. `validate` and `run start` reject more than 20 entries, and empty or over-255-character values. Needs a Perfana server that supports the field.
+
 ## v0.8.0 (2026-11-05)
 
 ### Breaking changes

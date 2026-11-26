@@ -2,9 +2,9 @@ package scheduler
 
 import (
 	"fmt"
-	"perfana-cli/logger"
 	"os"
 	"os/signal"
+	"perfana-cli/logger"
 	"sort"
 	"syscall"
 	"time"
@@ -15,9 +15,9 @@ import (
 type stopReason int
 
 const (
-	stopNormal   stopReason = iota
-	stopSignal              // SIGINT / SIGTERM
-	stopUIAbort             // abort flag set on test run via Perfana UI
+	stopNormal  stopReason = iota
+	stopSignal             // SIGINT / SIGTERM
+	stopUIAbort            // abort flag set on test run via Perfana UI
 )
 
 const maxAnalysisRetries = 30 // 30 × 10 s = 5 min max
@@ -552,6 +552,9 @@ func (s *EventScheduler) buildAdditionalData() map[string]interface{} {
 	}
 	if len(s.TestContext.DeepLinks) > 0 {
 		data["deepLinks"] = s.TestContext.DeepLinks
+	}
+	if len(s.TestContext.AdditionalSutMonitoring) > 0 {
+		data["additionalSutMonitoring"] = s.TestContext.AdditionalSutMonitoring
 	}
 	if len(s.TestContext.Variables) > 0 {
 		vars := make([]perfana_client.Variable, 0, len(s.TestContext.Variables))
